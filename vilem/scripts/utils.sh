@@ -4,9 +4,9 @@ function get_config() {
     TRAIN_DATA=$(realpath data/csv/train.csv)
     DEV_DATA=$(realpath data/csv/train_head.csv)
     CHECKPOINT_DIR=$(realpath "models/")
-    CHECKPOINT_FILENAME=$1
-    ENCODER_MODEL=$2
-    PRETRAINED_MODEL=$3
+    ENCODER_MODEL=$1
+    PRETRAINED_MODEL=$2
+    CHECKPOINT_FILENAME=$3
     
     # should prevent collisions
     mkdir -p tmp
