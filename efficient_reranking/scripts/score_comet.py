@@ -17,17 +17,9 @@ import torch
 from tqdm import tqdm
 from transformers import GenerationConfig
 
-from efficient_reranking.lib import datasets, generation, utils
+from efficient_reranking.lib import datasets, generation, utils, comet
 
 MAX_GENERATION_LENGTH = 256
-NUM_CANDIDATES = 256
-# For candidate generation with beam search
-CANDIDATE_GENERATION_CONFIG = GenerationConfig(
-    max_length=MAX_GENERATION_LENGTH,
-    num_beams=NUM_CANDIDATES,
-    num_return_sequences=NUM_CANDIDATES,
-    early_stopping=True
-)
 
 
 def main(args):
@@ -36,38 +28,40 @@ def main(args):
     work_dir.mkdir(parents=True, exist_ok=True)
 
     dataset = datasets.load_dataset(args.src_lang, args.tgt_lang, args.split)
-    if args.subset:
-        dataset = dataset.select(range(0, len(dataset), len(dataset) // args.subset))
-
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
     data_h5file = h5py.File(work_dir / (utils.DATA_FILENAME_BASE + ".h5"), 'a')
 
-    logging.info(f"Generating sequences.")
+    logging.info(f"Evaluting candidates with COMET model {args.comet_model}.")
 
-    if utils.CANDIDATES_H5DS_NAME in data_h5file:
+    comet_h5ds_name = utils.COMET_SCORES_H5DS_NAME_BASE + args.comet_model
+    candidates_h5ds = data_h5file[utils.CANDIDATES_H5DS_NAME]
+
+    if comet_h5ds_name in data_h5file:
         if args.overwrite:
-            logging.info(f"Dataset {utils.CANDIDATES_H5DS_NAME} exists but overwriting.")
+            logging.info(f"Dataset {comet_h5ds_name} exists but overwriting.")
         else:
-            logging.info(f"Dataset {utils.CANDIDATES_H5DS_NAME} exists, aborting. Use --overwrite to overwrite.")
+            logging.info(f"Dataset {comet_h5ds_name} exists, aborting. Use --overwrite to overwrite.")
             return
-        candidates_h5ds = data_h5file[utils.CANDIDATES_H5DS_NAME]
+        scores_h5ds = data_h5file[comet_h5ds_name]
     else:
-        candidates_h5ds = data_h5file.create_dataset(
-            utils.CANDIDATES_H5DS_NAME,
-            (len(dataset), NUM_CANDIDATES),
-            utils.H5_STRING_DTYPE)
+        scores_h5ds = data_h5file.create_dataset(
+            comet_h5ds_name,
+            candidates_h5ds.shape,
+            float)
 
-    model, tokenizer = generation.load_model_and_tokenizer(args.src_lang, args.tgt_lang)
-    model.to(device)
+    model = comet.load_model(args.comet_model).to(device)
 
-    for i in tqdm(range(len(dataset))):
-        inputs = tokenizer(dataset[i]["src"], padding=True, return_tensors="pt").to(model.device)
-        with torch.no_grad():
-            result = model.generate(**inputs, generation_config=CANDIDATE_GENERATION_CONFIG)
-        texts = tokenizer.batch_decode(result, skip_special_tokens=True)
-        for j, text in enumerate(texts):
-            candidates_h5ds[i, j] = text
+    for i in tqdm(range(candidates_h5ds.shape[0])):
+        src = dataset[i]["src"]
+        tgts = [candidates_h5ds[i, j].decode() for j in range(candidates_h5ds.shape[1])]
+        # inputs = model.encoder.prepare_sample([src] + tgts).to(device)
+        data = [
+            {"src": src, "mt": tgt}
+            for tgt in tgts
+        ]
+        result = model.predict(samples=data)
+        scores_h5ds[i] = result.scores
 
     logging.info(f"Finished generating candidates for {len(dataset)} instances.")
 
@@ -95,10 +89,11 @@ if __name__ == "__main__":
                          "Will be created if doesn't exist.")
 
     parser.add_argument(
-        "--overwrite", action="store_true", help="Overwrite existing data.")
+        "comet_model", help="Working directory for all steps. "
+                         "Will be created if doesn't exist.")
 
     parser.add_argument(
-        "--subset", type=int, help="Only process the first n items.")
+        "--overwrite", action="store_true", help="Overwrite existing data.")
 
     parser.add_argument(
         "--seed", type=int, default=0, help="Random seed for PyTorch.")
