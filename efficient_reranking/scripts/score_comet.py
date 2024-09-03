@@ -1,5 +1,6 @@
 import argparse
 import logging
+import os
 import sys
 
 # Logging format borrowed from Fairseq.
@@ -11,16 +12,20 @@ logging.basicConfig(
 
 from pathlib import Path
 
+import comet
 import h5py
 import torch
 
 from tqdm import tqdm
 from transformers import GenerationConfig
 
-from efficient_reranking.lib import datasets, generation, utils, comet
+from efficient_reranking.lib import datasets, generation, utils
 
 MAX_GENERATION_LENGTH = 256
 
+
+class MissingArgumentError(ValueError):
+    pass
 
 def main(args):
     torch.manual_seed(0)
@@ -32,9 +37,19 @@ def main(args):
 
     data_h5file = h5py.File(work_dir / (utils.DATA_FILENAME_BASE + ".h5"), 'a')
 
-    logging.info(f"Evaluting candidates with COMET model {args.comet_model}.")
+    logging.info(f"Evaluating candidates with COMET.")
 
-    comet_h5ds_name = utils.COMET_SCORES_H5DS_NAME_BASE + args.comet_model
+    if args.comet_repo:
+        comet_base_name = args.comet_repo.split("/")[-1]
+        model_path = comet.download_model(args.comet_model)
+        model = comet.load_from_checkpoint(model_path).eval()
+    elif args.comet_path:
+        comet_base_name = os.path.splitext(args.comet_path.split("/")[-1])[0]
+        model = comet.load_from_checkpoint(args.comet_path)
+    else:
+        raise MissingArgumentError("Must provide --comet_repo or --comet_path.")
+
+    comet_h5ds_name = utils.COMET_SCORES_H5DS_NAME_BASE + comet_base_name
     candidates_h5ds = data_h5file[utils.CANDIDATES_H5DS_NAME]
 
     if comet_h5ds_name in data_h5file:
@@ -49,8 +64,6 @@ def main(args):
             comet_h5ds_name,
             candidates_h5ds.shape,
             float)
-
-    model = comet.load_model(args.comet_model).to(device)
 
     for i in tqdm(range(candidates_h5ds.shape[0])):
         src = dataset[i]["src"]
@@ -89,8 +102,10 @@ if __name__ == "__main__":
                          "Will be created if doesn't exist.")
 
     parser.add_argument(
-        "comet_model", help="Working directory for all steps. "
-                         "Will be created if doesn't exist.")
+        "--comet_repo", help="Huggingface COMET model name. Must pass --comet_repo or --comet_path")
+
+    parser.add_argument(
+        "--comet_path", help="COMET model directory. Must pass --comet_repo or --comet_path")
 
     parser.add_argument(
         "--overwrite", action="store_true", help="Overwrite existing data.")
