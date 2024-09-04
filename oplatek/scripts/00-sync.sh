@@ -1,3 +1,3 @@
-#!/usr/bin/bash
+#!/bin/bash
 
-rsync -azP --filter=":- .gitignore" --exclude .git/ . geri:/cluster/work/sachan/vilem/comet-pruning
+rsync -azP --filter=":- .gitignore"  --exclude .git/ . geri:/home/oplatek/code/efficient_pruning/oplatek
