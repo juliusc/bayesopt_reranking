@@ -1,6 +1,6 @@
 # runs few steps with the following command
 # comet-train --load_from_checkpoint /home/oplatek/.cache/huggingface/hub/models--Unbabel--wmt22-cometkiwi-da/snapshots/b3a8aea5a5f
-# c22db68a554b92b3d96eb6ea75cc9/checkpoints/model.ckpt --cfg da/configs/cometkiwi_finetuning.yaml
+# c22db68a554b92b3d96eb6ea75cc9/checkpoints/model.ckpt --cfg da/configs/regression_model.yaml 
 unified_metric:
   # class_path: comet.models.RegressionMetric
   # class_path: comet.models.ReferencelessRegression
@@ -14,9 +14,9 @@ unified_metric:
     #   - data/wmt-enru-newstest2021.csv
     #   - data/wmt-zhen-newstest2021.csv
     train_data: 
-      - da/data/1720-da.mlqe.csv
+      - da/data/train.csv
     validation_data: 
-      - da/data/2021-da.csv
+      - da/data/train_head.csv
       # - da/data/2022-da.csv
       # - da/data/2021-mqm.csv
       # - da/data/2022-mqm.csv

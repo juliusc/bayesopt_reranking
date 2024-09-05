@@ -1,5 +1,9 @@
 class_path: pytorch_lightning.trainer.trainer.Trainer
 init_args:
+  # logger:
+  #   class_path: pytorch_lightning.loggers.WandbLogger
+  #   init_args:
+  #     project: efficient_reranking
   accelerator: gpu
   devices: 1
   # strategy: ddp # Uncomment this line for distributed training

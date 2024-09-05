@@ -1,0 +1,1 @@
+rsync -azP  . geri:/home/oplatek/code/efficient_pruning/oplatek/{data,models}
