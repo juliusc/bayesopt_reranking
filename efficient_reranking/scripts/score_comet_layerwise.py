@@ -27,6 +27,7 @@ MAX_GENERATION_LENGTH = 256
 class MissingArgumentError(ValueError):
     pass
 
+
 def main(args):
     torch.manual_seed(0)
     work_dir = Path(args.work_dir) / f"{args.src_lang}{args.tgt_lang}" / args.split
@@ -42,40 +43,58 @@ def main(args):
     if args.comet_repo:
         comet_base_name = args.comet_repo.split("/")[-1]
         model_path = comet.download_model(args.comet_repo)
-        model = comet.load_from_checkpoint(model_path).eval()
+        model = comet.load_from_checkpoint(model_path).eval().to(device)
     elif args.comet_path:
         comet_base_name = os.path.splitext(args.comet_path.split("/")[-1])[0]
-        model = comet.load_from_checkpoint(args.comet_path)
+        model = comet.load_from_checkpoint(args.comet_path).eval().to(device)
     else:
         raise MissingArgumentError("Must provide --comet_repo or --comet_path.")
 
     comet_h5ds_name = utils.COMET_SCORES_H5DS_NAME_BASE + comet_base_name
     candidates_h5ds = data_h5file[utils.CANDIDATES_H5DS_NAME]
+    all_score_h5ds = []
 
-    if comet_h5ds_name in data_h5file:
-        if args.overwrite:
-            logging.info(f"Dataset {comet_h5ds_name} exists but overwriting.")
+    for layer_idx in range(len(model.encoder.model.encoder.layer)+1):
+        comet_h5ds_name = utils.COMET_SCORES_H5DS_NAME_BASE + comet_base_name + f"_{layer_idx}"
+        if comet_h5ds_name in data_h5file:
+            if args.overwrite:
+                if layer_idx == 0:
+                    logging.info(f"Dataset {comet_h5ds_name} exists but overwriting.")
+            else:
+                logging.info(f"Dataset {comet_h5ds_name} exists, aborting. Use --overwrite to overwrite.")
+                return
+            all_score_h5ds.append(data_h5file[comet_h5ds_name])
         else:
-            logging.info(f"Dataset {comet_h5ds_name} exists, aborting. Use --overwrite to overwrite.")
-            return
-        scores_h5ds = data_h5file[comet_h5ds_name]
-    else:
-        scores_h5ds = data_h5file.create_dataset(
-            comet_h5ds_name,
-            candidates_h5ds.shape,
-            float)
+            all_score_h5ds.append(data_h5file.create_dataset(
+                comet_h5ds_name,
+                candidates_h5ds.shape,
+                float))
+
+    original_layerwise_attn_params = model.layerwise_attention.scalar_parameters
 
     for i in tqdm(range(candidates_h5ds.shape[0])):
         src = dataset[i]["src"]
         ref = dataset[i]["tgt"]
         tgts = [candidates_h5ds[i, j].decode() for j in range(candidates_h5ds.shape[1])]
-        # inputs = model.encoder.prepare_sample([src] + tgts).to(device)
-        data = [
-            {"src": src, "mt": tgt, "ref": ref}
-            for tgt in tgts
-        ]
-        result = model.predict(samples=data)
-        scores_h5ds[i] = result.scores
+        data = [ {"src": src, "mt": tgt} for tgt in tgts]
+
+        with torch.no_grad():
+            inputs = model.prepare_sample(data, stage="predict")[0]
+            encoder_out = model.encoder(inputs["input_ids"].to(device), inputs["attention_mask"].to(device))
+            for layer_idx in range(len(encoder_out["all_layers"])):
+                encoder_out_subset = encoder_out["all_layers"][:layer_idx+1]
+                # Hack the layerwise attention to work on fewer layers
+                model.layerwise_attention.scalar_parameters = model.layerwise_attention.scalar_parameters[:layer_idx+1]
+                model.layerwise_attention.num_layers = layer_idx + 1
+
+                layerwise_out = model.layerwise_attention(encoder_out_subset, mask=encoder_out["attention_mask"])
+                sentemb = layerwise_out[:, 0, :]
+                ff_out = model.estimator(sentemb)
+                all_score_h5ds[layer_idx][i] = ff_out.squeeze().cpu().numpy()
+
+                # Change the layerwise attention back
+                model.layerwise_attention.scalar_parameters = original_layerwise_attn_params
+                model.layerwise_attention.num_layers = len(encoder_out["all_layers"])
 
     logging.info(f"Finished.")
 

@@ -69,7 +69,7 @@ def main(args):
         for j, text in enumerate(texts):
             candidates_h5ds[i, j] = text
 
-    logging.info(f"Finished generating candidates for {len(dataset)} instances.")
+    logging.info(f"Finished.")
 
     data_h5file.close()
 
