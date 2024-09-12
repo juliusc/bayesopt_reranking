@@ -7,11 +7,18 @@ function get_config() {
     ENCODER_MODEL=$1
     PRETRAINED_MODEL=$2
     CHECKPOINT_FILENAME=$3
+
+    if [ -v COMET_CODENAME ]; then
+        echo "COMET_CODENAME is set to $COMET_CODENAME";
+    else
+        echo "COMET_CODENAME is unset";
+        exit 1;
+    fi
     
     # should prevent collisions
     mkdir -p tmp
     TMP_CONFIG_DIR=$(mktemp -d -p 'tmp/')
-    cp configs/* ${TMP_CONFIG_DIR}
+    cp configs/${COMET_CODENAME}/* ${TMP_CONFIG_DIR}
 
     cat configs/model.yaml \
         | sed "s|TRAIN_DATA_PATH|${TRAIN_DATA}|" \
