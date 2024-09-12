@@ -2,7 +2,7 @@ function get_config() {
     mkdir -p models
 
     TRAIN_DATA=$(realpath data/csv/train.csv)
-    DEV_DATA=$(realpath data/csv/train_head.csv)
+    DEV_DATA=$(realpath data/csv/dev.csv)
     CHECKPOINT_DIR=$(realpath "models/")
     ENCODER_MODEL=$1
     PRETRAINED_MODEL=$2
