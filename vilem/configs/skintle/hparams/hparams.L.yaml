@@ -18,6 +18,6 @@ loss: mse
 nr_frozen_epochs: 0.3
 optimizer: AdamW
 pool: avg
-pretrained_model: xlm-roberta-large
+pretrained_model: xlm-roberta-base
 train_data: []
 validation_data: []

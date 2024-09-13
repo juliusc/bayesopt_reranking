@@ -5,6 +5,7 @@ import json
 
 args = argparse.ArgumentParser()
 args.add_argument('-m', '--model')
+args.add_argument('-d', '--data', default='data/jsonl/test.jsonl')
 args.add_argument('-o', '--out')
 args.add_argument('-bs', '--batch-size', type=int, default=16)
 args = args.parse_args()
@@ -19,7 +20,7 @@ model = load_from_checkpoint(model_path)
 
 data = [
     json.loads(line)
-    for line in open('data/jsonl/test.jsonl')
+    for line in open(args.data)
 ]
 
 data_comet = [
