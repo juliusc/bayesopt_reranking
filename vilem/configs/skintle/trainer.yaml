@@ -4,7 +4,7 @@ init_args:
   devices: 1
   # strategy: ddp # Uncomment this line for distributed training
   #precision: 16  
-  accumulate_grad_batches: 8
+  accumulate_grad_batches: 1
   benchmark: null
   check_val_every_n_epoch: 1
   default_root_dir: null

@@ -1,7 +1,7 @@
 #!/usr/bin/bash
 
 . scripts/utils.sh
-export MODEL_CODENAME="riem"
+export COMET_CODENAME="riem"
 
 sbatch_gpu "riem-xlm-roberta-base" "comet-train --cfg $(get_config 'XLM-RoBERTa' 'xlm-roberta-base' 'riem-xlm-roberta-base')"
 

@@ -11,12 +11,3 @@ sbatch_gpu "cometkiwi-nllb-7" "python3 scripts/04a-score_comet.py -m Unbabel/wmt
 
 # put pieces together
 cat computed/train_cometkiwi_nllb_{0,1,2,3,4,5,6,7}.jsonl > data/jsonl/train_cometkiwi_nllb.jsonl
-python3 -c """
-import json
-data = [json.loads(x) for x in open('data/jsonl/train_cometkiwi_nllb.jsonl')]
-for line in data:
-    line["score"] = line.pop("model")
-with open("data/jsonl/train_cometkiwi_nllb.jsonl", "w") as f:
-    for line in data:
-        f.write(json.dumps(line, ensure_ascii=False) + '\\n')
-"""

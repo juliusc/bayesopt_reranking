@@ -7,13 +7,6 @@ function get_config() {
     ENCODER_MODEL=$1
     PRETRAINED_MODEL=$2
     CHECKPOINT_FILENAME=$3
-
-    if [ -v COMET_CODENAME ]; then
-        echo "COMET_CODENAME is set to $COMET_CODENAME";
-    else
-        echo "COMET_CODENAME is unset";
-        exit 1;
-    fi
     
     # should prevent collisions
     mkdir -p tmp
@@ -31,6 +24,19 @@ function get_config() {
         | sed "s|CHECKPOINT_FILENAME|${CHECKPOINT_FILENAME}|" \
         > ${TMP_CONFIG_DIR}/model_checkpoint.yaml
     echo ${TMP_CONFIG_DIR}/model.yaml
+}
+
+function sbatch_cpu() {
+    JOB_NAME=$1;
+    JOB_WRAP=$2;
+    mkdir -p logs
+
+    sbatch \
+        -J $JOB_NAME --output=logs/%x.out --error=logs/%x.err \
+        --ntasks-per-node=1 \
+        --cpus-per-task=6 \
+        --mem-per-cpu=10G --time=1-0 \
+        --wrap="$JOB_WRAP";
 }
 
 function sbatch_gpu() {
