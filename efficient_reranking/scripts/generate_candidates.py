@@ -1,4 +1,5 @@
 import argparse
+import json
 import logging
 import sys
 
@@ -15,12 +16,12 @@ import h5py
 import torch
 
 from tqdm import tqdm
-from transformers import GenerationConfig
+from transformers import GenerationConfig, M2M100ForConditionalGeneration, AutoTokenizer
 
 from efficient_reranking.lib import datasets, generation, utils
 
 MAX_GENERATION_LENGTH = 256
-NUM_CANDIDATES = 256
+NUM_CANDIDATES = 128
 # For candidate generation with beam search
 CANDIDATE_GENERATION_CONFIG = GenerationConfig(
     max_length=MAX_GENERATION_LENGTH,
@@ -32,63 +33,86 @@ CANDIDATE_GENERATION_CONFIG = GenerationConfig(
 
 def main(args):
     torch.manual_seed(0)
-    work_dir = Path(args.work_dir) / f"{args.src_lang}{args.tgt_lang}" / args.split
+    work_dir = Path(args.work_dir) / args.split
     work_dir.mkdir(parents=True, exist_ok=True)
 
-    dataset = datasets.load_dataset(args.src_lang, args.tgt_lang, args.split)
-    if args.subset:
-        dataset = dataset.select(range(0, len(dataset), len(dataset) // args.subset))
+    logging.info(f"Generating candidates...")
+
+    output_path = work_dir / (utils.CANDIDATES_FILENAME + ".h5")
+    if output_path.exists():
+        if args.overwrite:
+            logging.info(f"Output file {output_path} exists but overwriting.")
+        else:
+            logging.info(f"Output file {output_path} exists, aborting. Use --overwrite to overwrite.")
+            return
+
+    data_path = Path(args.data_dir) / "jsonl" / f"{args.split}.jsonl"
+    data_lines = open(data_path).readlines()
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    model = M2M100ForConditionalGeneration.from_pretrained(utils.NLLB_MODEL_NAME).to(device)
+    tokenizer = AutoTokenizer.from_pretrained(utils.NLLB_MODEL_NAME)
 
-    data_h5file = h5py.File(work_dir / (utils.DATA_FILENAME_BASE + ".h5"), 'a')
+    with h5py.File(output_path, "w") as output_file:
+        text_h5ds = output_file.create_dataset(
+            utils.CANDIDATES_TEXT_H5DS_NAME,
+            (len(data_lines), NUM_CANDIDATES),
+            utils.H5_STRING_DTYPE
+        )
+        token_logprobs_h5 = output_file.create_dataset(
+            utils.CANDIDATES_TOKEN_LOGPROBS_H5DS_NAME,
+            (len(data_lines), NUM_CANDIDATES),
+            utils.H5_VLEN_FLOAT_DTYPE
+        )
+        for i, data_line in enumerate(tqdm(data_lines)):
+            data = json.loads(data_line)
+            src_lang, tgt_lang = data["langs"].split("-")
+            # The way the tokenizer src_lang is set and tgt_lang is set during generate()
+            # is specific to NLLB.
+            tokenizer.src_lang = utils.LANG_TO_NLLB[src_lang]
+            tgt_lang_token = tokenizer.convert_tokens_to_ids(utils.LANG_TO_NLLB[tgt_lang])
+            inputs = tokenizer(data["src"], padding=True, return_tensors="pt").to(model.device)
+            with torch.no_grad():
+                result = model.generate(
+                    **inputs,
+                    generation_config=CANDIDATE_GENERATION_CONFIG,
+                    forced_bos_token_id=tgt_lang_token,
+                    output_scores=True,
+                    return_dict_in_generate=True)
 
-    logging.info(f"Generating sequences.")
+            texts = tokenizer.batch_decode(result.sequences, skip_special_tokens=True)
 
-    if utils.CANDIDATES_H5DS_NAME in data_h5file:
-        if args.overwrite:
-            logging.info(f"Dataset {utils.CANDIDATES_H5DS_NAME} exists but overwriting.")
-        else:
-            logging.info(f"Dataset {utils.CANDIDATES_H5DS_NAME} exists, aborting. Use --overwrite to overwrite.")
-            return
-        candidates_h5ds = data_h5file[utils.CANDIDATES_H5DS_NAME]
-    else:
-        candidates_h5ds = data_h5file.create_dataset(
-            utils.CANDIDATES_H5DS_NAME,
-            (len(dataset), NUM_CANDIDATES),
-            utils.H5_STRING_DTYPE)
+            # Get token log probabilities for generated sequences
+            # NOTE (julius) compute_transition_scores() is super compute and memory
+            # inefficient so wrote a custom version
+            # logprobs = model.compute_transition_scores(
+            #     result.sequences,
+            #     [scores for scores in result.scores],
+            #     beam_indices=result.beam_indices)[:, 1:]
 
-    model, tokenizer = generation.load_model_and_tokenizer(args.src_lang, args.tgt_lang)
-    model.to(device)
+            logprobs = torch.zeros_like(result.sequences[:, 2:], dtype=result.scores[0].dtype)
+            for t in range(2, result.sequences.shape[1]):
+                beam_scores =  result.scores[t-1].index_select(0, result.beam_indices[:, t-1].clamp(min=0))
+                seq_scores = beam_scores.gather(1, result.sequences[:, t:t+1]).squeeze()
+                logprobs[:, t-2] = seq_scores
 
-    for i in tqdm(range(len(dataset))):
-        inputs = tokenizer(dataset[i]["src"], padding=True, return_tensors="pt").to(model.device)
-        with torch.no_grad():
-            result = model.generate(**inputs, generation_config=CANDIDATE_GENERATION_CONFIG)
-        texts = tokenizer.batch_decode(result, skip_special_tokens=True)
-        for j, text in enumerate(texts):
-            candidates_h5ds[i, j] = text
+            for j, text in enumerate(texts):
+                text_h5ds[i, j] = text
+                seq_length = (result.sequences[j] != tokenizer.pad_token_id).sum() - 2
+                token_logprobs_h5[i, j] = logprobs[j][:seq_length].cpu().numpy()
 
     logging.info(f"Finished.")
 
-    data_h5file.close()
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
 
     parser.add_argument(
-        "src_lang",
-        help="Source language pair. Supported languages are 'ende' and those supported by"
-             " Facebook M2M100 (https://huggingface.co/facebook/m2m100_418M). 'ende',")
+        "data_dir", help="Data directory generated by the pipeline from vilem/scripts.")
 
     parser.add_argument(
-        "tgt_lang",
-        help="Source language pair. Supported languages are 'ende' and those supported by"
-             " Facebook M2M100 (https://huggingface.co/facebook/m2m100_418M). 'ende',")
-
-    parser.add_argument(
-        "split", type=str, help="Data split. Either 'validation' or 'test'.")
+        "split", type=str, help="Data split. Either 'dev' or 'test'.")
 
     parser.add_argument(
         "work_dir", help="Working directory for all steps. "
