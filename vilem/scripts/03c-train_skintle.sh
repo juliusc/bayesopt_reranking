@@ -33,5 +33,14 @@ function get_config() {
 }
 
 sbatch_gpu "skintle-s" "comet-train --cfg $(get_config 'MiniLM' 'microsoft/Multilingual-MiniLM-L12-H384' 'skintle-s')"
+# ran with batch size 32, might crash?
+export COMET_CODENAME="skintle-acc"
 sbatch_gpu "skintle-m" "comet-train --cfg $(get_config 'BERT' 'bert-base-multilingual-cased' 'skintle-m')"
 sbatch_gpu "skintle-l" "comet-train --cfg $(get_config 'XLM-RoBERTa' 'xlm-roberta-base' 'skintle-l')"
+
+
+# for i in 1 5 10 15 20; do
+#     python3 scripts/04a-score_comet.py \
+#         -m ./models/skintle-s/models/skintle-s-v$i.ckpt \
+#         -o computed/test.skintle-s-v$i.jsonl;
+# done;
