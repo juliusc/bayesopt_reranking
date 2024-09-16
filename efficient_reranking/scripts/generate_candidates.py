@@ -38,14 +38,6 @@ def main(args):
 
     logging.info(f"Generating candidates...")
 
-    output_path = work_dir / (utils.CANDIDATES_FILENAME + ".h5")
-    if output_path.exists():
-        if args.overwrite:
-            logging.info(f"Output file {output_path} exists but overwriting.")
-        else:
-            logging.info(f"Output file {output_path} exists, aborting. Use --overwrite to overwrite.")
-            return
-
     data_path = Path(args.data_dir) / "jsonl" / f"{args.split}.jsonl"
     data_lines = open(data_path).readlines()
 
@@ -53,18 +45,33 @@ def main(args):
     model = M2M100ForConditionalGeneration.from_pretrained(utils.NLLB_MODEL_NAME).to(device)
     tokenizer = AutoTokenizer.from_pretrained(utils.NLLB_MODEL_NAME)
 
-    with h5py.File(output_path, "w") as output_file:
-        text_h5ds = output_file.create_dataset(
-            utils.CANDIDATES_TEXT_H5DS_NAME,
-            (len(data_lines), NUM_CANDIDATES),
-            utils.H5_STRING_DTYPE
-        )
-        token_logprobs_h5 = output_file.create_dataset(
-            utils.CANDIDATES_TOKEN_LOGPROBS_H5DS_NAME,
-            (len(data_lines), NUM_CANDIDATES),
-            utils.H5_VLEN_FLOAT_DTYPE
-        )
+    output_path = work_dir / (utils.CANDIDATES_FILENAME + ".h5")
+    if output_path.exists():
+        if args.overwrite:
+            logging.info(f"Output file {output_path} exists but overwriting.")
+        else:
+            logging.info(f"Output file {output_path} exists, only doing unfinished instances. Use --overwrite to overwrite.")
+
+    with h5py.File(output_path, "a") as output_file:
+        # Fetch or create h5 datasets
+        if utils.CANDIDATES_TEXT_H5DS_NAME in output_file:
+            text_h5ds = output_file[utils.CANDIDATES_TEXT_H5DS_NAME]
+            token_logprobs_h5 = output_file[utils.CANDIDATES_TOKEN_LOGPROBS_H5DS_NAME]
+        else:
+            text_h5ds = output_file.create_dataset(
+                utils.CANDIDATES_TEXT_H5DS_NAME,
+                (len(data_lines), NUM_CANDIDATES),
+                utils.H5_STRING_DTYPE
+            )
+            token_logprobs_h5 = output_file.create_dataset(
+                utils.CANDIDATES_TOKEN_LOGPROBS_H5DS_NAME,
+                (len(data_lines), NUM_CANDIDATES),
+                utils.H5_VLEN_FLOAT_DTYPE
+            )
+
         for i, data_line in enumerate(tqdm(data_lines)):
+            if text_h5ds[i][0] and not args.overwrite:
+                continue
             data = json.loads(data_line)
             src_lang, tgt_lang = data["langs"].split("-")
             # The way the tokenizer src_lang is set and tgt_lang is set during generate()
@@ -73,23 +80,26 @@ def main(args):
             tgt_lang_token = tokenizer.convert_tokens_to_ids(utils.LANG_TO_NLLB[tgt_lang])
             inputs = tokenizer(data["src"], padding=True, return_tensors="pt").to(model.device)
             with torch.no_grad():
-                result = model.generate(
-                    **inputs,
-                    generation_config=CANDIDATE_GENERATION_CONFIG,
-                    forced_bos_token_id=tgt_lang_token,
-                    output_scores=True,
-                    return_dict_in_generate=True)
+                try:
+                    result = model.generate(
+                        **inputs,
+                        generation_config=CANDIDATE_GENERATION_CONFIG,
+                        forced_bos_token_id=tgt_lang_token,
+                        output_scores=True,
+                        return_dict_in_generate=True)
+                except torch.OutOfMemoryError:
+                    logging.info(f"Instance {i} failed with out-of-memory error. Skipping.")
+                    continue
 
             texts = tokenizer.batch_decode(result.sequences, skip_special_tokens=True)
 
-            # Get token log probabilities for generated sequences
-            # NOTE (julius) compute_transition_scores() is super compute and memory
-            # inefficient so wrote a custom version
+            # Get token log probabilities for beam search candidates.
+            # NOTE (julius) compute_transition_scores() is slow and was causing OOM
+            # errors so wrote a custom version.
             # logprobs = model.compute_transition_scores(
             #     result.sequences,
             #     [scores for scores in result.scores],
             #     beam_indices=result.beam_indices)[:, 1:]
-
             logprobs = torch.zeros_like(result.sequences[:, 2:], dtype=result.scores[0].dtype)
             for t in range(2, result.sequences.shape[1]):
                 beam_scores =  result.scores[t-1].index_select(0, result.beam_indices[:, t-1].clamp(min=0))

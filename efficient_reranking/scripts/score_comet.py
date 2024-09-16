@@ -4,6 +4,8 @@ import logging
 import os
 import sys
 
+import numpy as np
+
 # Logging format borrowed from Fairseq.
 logging.basicConfig(
     stream=sys.stdout,
@@ -51,35 +53,66 @@ def main(args):
             logging.info(f"Output file {output_path} exists but overwriting.")
         else:
             logging.info(f"Output file {output_path} exists, aborting. Use --overwrite to overwrite.")
-            return
 
     candidates_path = work_dir / (utils.CANDIDATES_FILENAME + ".h5")
     data_path = Path(args.data_dir) / "jsonl" / f"{args.split}.jsonl"
     data_lines = open(data_path).readlines()
 
-    with (h5py.File(output_path, "w") as output_file,
+    with (h5py.File(output_path, "a") as output_file,
           h5py.File(candidates_path) as candidates_file):
         candidates_text_h5ds = candidates_file[utils.CANDIDATES_TEXT_H5DS_NAME]
-        scores_h5ds = output_file.create_dataset(
-            utils.COMET_SCORES_H5DS_NAME,
-            candidates_text_h5ds.shape,
-            float
-        )
+        if utils.COMET_SCORES_H5DS_NAME in output_file:
+            scores_h5ds = output_file[utils.COMET_SCORES_H5DS_NAME]
+        else:
+            scores_h5ds = output_file.create_dataset(
+                utils.COMET_SCORES_H5DS_NAME,
+                candidates_text_h5ds.shape,
+                float
+            )
 
+        data_idxs = []
+        inputs = []
+        logging.info("Preparing inputs...")
         for i, data_line in enumerate(tqdm(data_lines)):
+            if scores_h5ds[i, 0] and not args.overwrite:
+                continue
+            data_idxs.append(i)
             data = json.loads(data_line)
             src = data["src"]
             tgts = [candidates_text_h5ds[i, j].decode() for j in range(candidates_text_h5ds.shape[1])]
-            # inputs = model.encoder.prepare_sample([src] + tgts).to(device)
-            data = [
-                {"src": src, "mt": tgt}
-                for tgt in tgts
-            ]
-            result = model.predict(samples=data)
-            scores_h5ds[i] = result.scores
+            # Skip missing candidates
+            if all(not tgt for tgt in tgts):
+                continue
+            for tgt in tgts:
+                inputs.append({"src": src, "mt": tgt})
+
+        logging.info("Scoring...")
+        result = model.predict(samples=inputs, batch_size=args.comet_batch_size)
+        scores = np.matrix(result.scores).reshape(-1, scores_h5ds.shape[1])
+
+        for result_idx, data_idx in enumerate(data_idxs):
+            scores_h5ds[data_idx] = scores[result_idx]
+
+        # # Old code that didn't pass all inputs into COMET at once, which is
+        # # much faster
+        # for i, data_line in enumerate(tqdm(data_lines)):
+        #     if scores_h5ds[i, 0] and not args.overwrite:
+        #         continue
+        #     data = json.loads(data_line)
+        #     src = data["src"]
+        #     tgts = [candidates_text_h5ds[i, j].decode() for j in range(candidates_text_h5ds.shape[1])]
+        #     # Skip missing candidates
+        #     if all(not tgt for tgt in tgts):
+        #         continue
+        #     # inputs = model.encoder.prepare_sample([src] + tgts).to(device)
+        #     data = [
+        #         {"src": src, "mt": tgt}
+        #         for tgt in tgts
+        #     ]
+        #     result = model.predict(samples=data, batch_size=128)
+        #     scores_h5ds[i] = result.scores
 
     logging.info(f"Finished.")
-
 
 
 if __name__ == "__main__":
@@ -106,6 +139,10 @@ if __name__ == "__main__":
 
     parser.add_argument(
         "--seed", type=int, default=0, help="Random seed for PyTorch.")
+
+    parser.add_argument(
+        "--comet_batch_size", type=int, default=128, help="COMET batch size.")
+
 
     args = parser.parse_args()
     main(args)
