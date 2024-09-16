@@ -40,7 +40,10 @@ sbatch_gpu "skintle-l" "comet-train --cfg $(get_config 'XLM-RoBERTa' 'xlm-robert
 
 
 # for i in 1 5 10 15 20; do
-#     python3 scripts/04a-score_comet.py \
-#         -m ./models/skintle-s/models/skintle-s-v$i.ckpt \
-#         -o computed/test.skintle-s-v$i.jsonl;
+#     for size in S L M; do
+#         python3 scripts/04a-score_comet.py \
+#             -m ./models/skintle-$size/model/skintle-$size-v$i.ckpt \
+#             -o computed/test.skintle-$size-v$i.jsonl \
+#             -bs 32;
+#     done
 # done;
