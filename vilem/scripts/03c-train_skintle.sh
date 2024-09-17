@@ -3,7 +3,6 @@
 . scripts/utils.sh
 export COMET_CODENAME="skintle"
 
-
 function get_config() {
     mkdir -p models
 
@@ -32,11 +31,9 @@ function get_config() {
     echo ${TMP_CONFIG_DIR}/model.yaml
 }
 
-sbatch_gpu "skintle-s" "comet-train --cfg $(get_config 'MiniLM' 'microsoft/Multilingual-MiniLM-L12-H384' 'skintle-s')"
-# ran with batch size 32, might crash?
-export COMET_CODENAME="skintle-acc"
-sbatch_gpu "skintle-m" "comet-train --cfg $(get_config 'BERT' 'bert-base-multilingual-cased' 'skintle-m')"
-sbatch_gpu "skintle-l" "comet-train --cfg $(get_config 'XLM-RoBERTa' 'xlm-roberta-base' 'skintle-l')"
+sbatch_gpu "skintle-S" "comet-train --cfg $(get_config 'BERT' 'sentence-transformers/all-MiniLM-L12-v2' 'skintle-S')"
+sbatch_gpu "skintle-M" "comet-train --cfg $(get_config 'MiniLM' 'microsoft/Multilingual-MiniLM-L12-H384' 'skintle-M')"
+COMET_CODENAME="skintle-acc" sbatch_gpu "skintle-L" "comet-train --cfg $(get_config 'XLM-RoBERTa' 'xlm-roberta-base' 'skintle-L')"
 
 
 # for i in 1 5 10 15 20; do

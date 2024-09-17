@@ -9,7 +9,7 @@ init_args:
   mode: max
   auto_insert_metric_name: True
   save_weights_only: True
-  every_n_train_steps: 10000
+  every_n_train_steps: 50000
   train_time_interval: null
   every_n_epochs: null
   save_on_train_epoch_end: null

@@ -30,6 +30,7 @@ function get_config() {
     echo ${TMP_CONFIG_DIR}/model.yaml
 }
 
+# try all combinations
 # for ARCH in  "BERT" "XLM-RoBERTa" "MiniLM" "XLM-RoBERTa-XL" "RemBERT"; do
 #     for MODEL in \
 #         "sentence-transformers/all-MiniLM-L6-v2" \
