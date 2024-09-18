@@ -6,6 +6,8 @@ unified_metric:
   # class_path: comet.models.ReferencelessRegression
   class_path: comet.models.UnifiedMetric
   init_args:
+    use_first_layers: -6
+    remove_unused_layers_from_encoder: false
     # ORIGINAL wmt22-cometkiwi-da data
     # train_data:
     #   - data/1720-da.mlqe-src.csv
