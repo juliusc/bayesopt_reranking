@@ -2,3 +2,5 @@ tmp
 COMET
 data/
 lightning_logs/
+computed
+models

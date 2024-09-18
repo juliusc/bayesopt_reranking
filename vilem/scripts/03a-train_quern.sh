@@ -1,6 +1,7 @@
 #!/usr/bin/bash
 
 . scripts/utils.sh
+export COMET_CODENAME="quern"
 
 sbatch_gpu "quern-xlm-roberta-base" "comet-train --cfg $(get_config 'XLM-RoBERTa' 'xlm-roberta-base' 'quern-xlm-roberta-base')"
 

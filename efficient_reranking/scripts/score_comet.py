@@ -1,7 +1,10 @@
 import argparse
+import json
 import logging
 import os
 import sys
+
+import numpy as np
 
 # Logging format borrowed from Fairseq.
 logging.basicConfig(
@@ -21,27 +24,22 @@ from transformers import GenerationConfig
 
 from efficient_reranking.lib import datasets, generation, utils
 
-MAX_GENERATION_LENGTH = 256
-
 
 class MissingArgumentError(ValueError):
     pass
 
 def main(args):
     torch.manual_seed(0)
-    work_dir = Path(args.work_dir) / f"{args.src_lang}{args.tgt_lang}" / args.split
+    work_dir = Path(args.work_dir) / args.split
     work_dir.mkdir(parents=True, exist_ok=True)
 
-    dataset = datasets.load_dataset(args.src_lang, args.tgt_lang, args.split)
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-    data_h5file = h5py.File(work_dir / (utils.DATA_FILENAME_BASE + ".h5"), 'a')
-
-    logging.info(f"Evaluating candidates with COMET.")
+    logging.info(f"Evaluating candidates with COMET...")
 
     if args.comet_repo:
         comet_base_name = args.comet_repo.split("/")[-1]
-        model_path = comet.download_model(args.comet_model)
+        model_path = comet.download_model(args.comet_repo)
         model = comet.load_from_checkpoint(model_path).eval()
     elif args.comet_path:
         comet_base_name = os.path.splitext(args.comet_path.split("/")[-1])[0]
@@ -49,53 +47,82 @@ def main(args):
     else:
         raise MissingArgumentError("Must provide --comet_repo or --comet_path.")
 
-    comet_h5ds_name = utils.COMET_SCORES_H5DS_NAME_BASE + comet_base_name
-    candidates_h5ds = data_h5file[utils.CANDIDATES_H5DS_NAME]
-
-    if comet_h5ds_name in data_h5file:
+    output_path = work_dir / (utils.COMET_SCORES_FILENAME_BASE + comet_base_name + ".h5")
+    if output_path.exists():
         if args.overwrite:
-            logging.info(f"Dataset {comet_h5ds_name} exists but overwriting.")
+            logging.info(f"Output file {output_path} exists but overwriting.")
         else:
-            logging.info(f"Dataset {comet_h5ds_name} exists, aborting. Use --overwrite to overwrite.")
-            return
-        scores_h5ds = data_h5file[comet_h5ds_name]
-    else:
-        scores_h5ds = data_h5file.create_dataset(
-            comet_h5ds_name,
-            candidates_h5ds.shape,
-            float)
+            logging.info(f"Output file {output_path} exists, aborting. Use --overwrite to overwrite.")
 
-    for i in tqdm(range(candidates_h5ds.shape[0])):
-        src = dataset[i]["src"]
-        tgts = [candidates_h5ds[i, j].decode() for j in range(candidates_h5ds.shape[1])]
-        # inputs = model.encoder.prepare_sample([src] + tgts).to(device)
-        data = [
-            {"src": src, "mt": tgt}
-            for tgt in tgts
-        ]
-        result = model.predict(samples=data)
-        scores_h5ds[i] = result.scores
+    candidates_path = work_dir / (utils.CANDIDATES_FILENAME + ".h5")
+    data_path = Path(args.data_dir) / "jsonl" / f"{args.split}.jsonl"
+    data_lines = open(data_path).readlines()
 
-    logging.info(f"Finished generating candidates for {len(dataset)} instances.")
+    with (h5py.File(output_path, "a") as output_file,
+          h5py.File(candidates_path) as candidates_file):
+        candidates_text_h5ds = candidates_file[utils.CANDIDATES_TEXT_H5DS_NAME]
+        if utils.COMET_SCORES_H5DS_NAME in output_file:
+            scores_h5ds = output_file[utils.COMET_SCORES_H5DS_NAME]
+        else:
+            scores_h5ds = output_file.create_dataset(
+                utils.COMET_SCORES_H5DS_NAME,
+                candidates_text_h5ds.shape,
+                float
+            )
 
-    data_h5file.close()
+        data_idxs = []
+        inputs = []
+        logging.info("Preparing inputs...")
+        for i, data_line in enumerate(tqdm(data_lines)):
+            if scores_h5ds[i, 0] and not args.overwrite:
+                continue
+            data_idxs.append(i)
+            data = json.loads(data_line)
+            src = data["src"]
+            tgts = [candidates_text_h5ds[i, j].decode() for j in range(candidates_text_h5ds.shape[1])]
+            # Skip missing candidates
+            if all(not tgt for tgt in tgts):
+                continue
+            for tgt in tgts:
+                inputs.append({"src": src, "mt": tgt})
+
+        logging.info("Scoring...")
+        result = model.predict(samples=inputs, batch_size=args.comet_batch_size)
+        scores = np.matrix(result.scores).reshape(-1, scores_h5ds.shape[1])
+
+        for result_idx, data_idx in enumerate(data_idxs):
+            scores_h5ds[data_idx] = scores[result_idx]
+
+        # # Old code that didn't pass all inputs into COMET at once, which is
+        # # much faster
+        # for i, data_line in enumerate(tqdm(data_lines)):
+        #     if scores_h5ds[i, 0] and not args.overwrite:
+        #         continue
+        #     data = json.loads(data_line)
+        #     src = data["src"]
+        #     tgts = [candidates_text_h5ds[i, j].decode() for j in range(candidates_text_h5ds.shape[1])]
+        #     # Skip missing candidates
+        #     if all(not tgt for tgt in tgts):
+        #         continue
+        #     # inputs = model.encoder.prepare_sample([src] + tgts).to(device)
+        #     data = [
+        #         {"src": src, "mt": tgt}
+        #         for tgt in tgts
+        #     ]
+        #     result = model.predict(samples=data, batch_size=128)
+        #     scores_h5ds[i] = result.scores
+
+    logging.info(f"Finished.")
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
 
     parser.add_argument(
-        "src_lang",
-        help="Source language pair. Supported languages are 'ende' and those supported by"
-             " Facebook M2M100 (https://huggingface.co/facebook/m2m100_418M). 'ende',")
+        "data_dir", help="Data directory generated by the pipeline from vilem/scripts.")
 
     parser.add_argument(
-        "tgt_lang",
-        help="Source language pair. Supported languages are 'ende' and those supported by"
-             " Facebook M2M100 (https://huggingface.co/facebook/m2m100_418M). 'ende',")
-
-    parser.add_argument(
-        "split", type=str, help="Data split. Either 'validation' or 'test'.")
+        "split", type=str, help="Data split. Either 'dev' or 'test'.")
 
     parser.add_argument(
         "work_dir", help="Working directory for all steps. "
@@ -112,6 +139,10 @@ if __name__ == "__main__":
 
     parser.add_argument(
         "--seed", type=int, default=0, help="Random seed for PyTorch.")
+
+    parser.add_argument(
+        "--comet_batch_size", type=int, default=128, help="COMET batch size.")
+
 
     args = parser.parse_args()
     main(args)
