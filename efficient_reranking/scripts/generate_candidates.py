@@ -1,14 +1,5 @@
 import argparse
 import json
-import logging
-import sys
-
-# Logging format borrowed from Fairseq.
-logging.basicConfig(
-    stream=sys.stdout,
-    level=logging.INFO,
-    datefmt="%Y-%m-%d %H:%M:%S",
-    format="%(asctime)s | %(levelname)s | %(name)s | %(message)s")
 
 from pathlib import Path
 
@@ -18,7 +9,7 @@ import torch
 from tqdm import tqdm
 from transformers import GenerationConfig, M2M100ForConditionalGeneration, AutoTokenizer
 
-from efficient_reranking.lib import datasets, generation, utils
+from efficient_reranking.lib import utils
 
 MAX_GENERATION_LENGTH = 256
 NUM_CANDIDATES = 128
@@ -36,23 +27,22 @@ def main(args):
     work_dir = Path(args.work_dir) / args.split
     work_dir.mkdir(parents=True, exist_ok=True)
 
-    logging.info(f"Generating candidates...")
+    output_path_base = work_dir / (utils.CANDIDATES_FILENAME)
+    output_path = output_path_base.with_suffix(".h5")
+    logger = utils.get_logger(
+        "generate_candidates.py", output_path_base.with_suffix(".log"))
 
     data_path = Path(args.data_dir) / "jsonl" / f"{args.split}.jsonl"
     data_lines = open(data_path).readlines()
+
+    if output_path.exists():
+        raise ValueError(f"Output file {output_path} already exists.")
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     model = M2M100ForConditionalGeneration.from_pretrained(utils.NLLB_MODEL_NAME).to(device)
     tokenizer = AutoTokenizer.from_pretrained(utils.NLLB_MODEL_NAME)
 
-    output_path = work_dir / (utils.CANDIDATES_FILENAME + ".h5")
-    if output_path.exists():
-        if args.overwrite:
-            logging.info(f"Output file {output_path} exists but overwriting.")
-        else:
-            logging.info(f"Output file {output_path} exists, only doing unfinished instances. Use --overwrite to overwrite.")
-
-    with h5py.File(output_path, "a") as output_file:
+    with h5py.File(output_path, "w") as output_file:
         # Fetch or create h5 datasets
         if utils.CANDIDATES_TEXT_H5DS_NAME in output_file:
             text_h5ds = output_file[utils.CANDIDATES_TEXT_H5DS_NAME]
@@ -69,9 +59,9 @@ def main(args):
                 utils.H5_VLEN_FLOAT_DTYPE
             )
 
-        for i, data_line in enumerate(tqdm(data_lines)):
-            if text_h5ds[i][0] and not args.overwrite:
-                continue
+        logger.info(f"Generating candidates...")
+
+        for i, data_line in enumerate(tqdm(data_lines[:args.subset])):
             data = json.loads(data_line)
             src_lang, tgt_lang = data["langs"].split("-")
             # The way the tokenizer src_lang is set and tgt_lang is set during generate()
@@ -88,7 +78,7 @@ def main(args):
                         output_scores=True,
                         return_dict_in_generate=True)
                 except torch.OutOfMemoryError:
-                    logging.info(f"Instance {i} failed with out-of-memory error. Skipping.")
+                    logger.info(f"Instance {i} failed with out-of-memory error. Skipping.")
                     continue
 
             texts = tokenizer.batch_decode(result.sequences, skip_special_tokens=True)
@@ -111,7 +101,7 @@ def main(args):
                 seq_length = (result.sequences[j] != tokenizer.pad_token_id).sum() - 2
                 token_logprobs_h5[i, j] = logprobs[j][:seq_length].cpu().numpy()
 
-    logging.info(f"Finished.")
+    logger.info(f"Finished.")
 
 
 
@@ -127,9 +117,6 @@ if __name__ == "__main__":
     parser.add_argument(
         "work_dir", help="Working directory for all steps. "
                          "Will be created if doesn't exist.")
-
-    parser.add_argument(
-        "--overwrite", action="store_true", help="Overwrite existing data.")
 
     parser.add_argument(
         "--subset", type=int, help="Only process the first n items.")
