@@ -9,12 +9,13 @@ init_args:
   # strategy: ddp # Uncomment this line for distributed training
   #precision: 16  
   accumulate_grad_batches: 8
+  accumulate_grad_batches: 1
   benchmark: null
   check_val_every_n_epoch: 1
   default_root_dir: null
   deterministic: False
   fast_dev_run: False
-  max_epochs: 1
+  max_epochs: 5
   min_epochs: 1
   max_steps: -1
   min_steps: null
@@ -27,7 +28,7 @@ init_args:
   val_check_interval: 1.0
   check_val_every_n_epoch: 1
   num_sanity_val_steps: 3
-  log_every_n_steps: 50
+  log_every_n_steps: 10
   enable_progress_bar: true
   enable_model_summary: true
   gradient_clip_val: 1.0
