@@ -1,3 +1,5 @@
+import logging
+import sys
 import h5py
 import numpy as np
 
@@ -40,3 +42,19 @@ CANDIDATES_TOKEN_LOGPROBS_H5DS_NAME = "token_logprobs"
 # Name of COMET model should be appended to this
 COMET_SCORES_FILENAME_BASE = "scores_comet_"
 COMET_SCORES_H5DS_NAME = "scores"
+
+
+def get_logger(name, output_filename):
+    file_handler = logging.FileHandler(output_filename, mode='w')
+    stream_handler = logging.StreamHandler(sys.stdout)
+    logger = logging.getLogger(name)
+    formatter = logging.Formatter(
+        "%(asctime)s | %(levelname)s | %(name)s | %(message)s",
+        "%Y-%m-%d %H:%M:%S")
+    for h in [file_handler]:
+        h.setLevel(logging.INFO)
+        h.setFormatter(formatter)
+        logger.addHandler(h)
+    logger.setLevel(logging.INFO)
+    return logger
+

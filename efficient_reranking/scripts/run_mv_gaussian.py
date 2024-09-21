@@ -100,14 +100,20 @@ def get_data_indices(data_dir, work_dir, split, model_class_name, lang_pair):
     # (some candidates failed due to OOM).
     data_indices = []
     data_path = Path(data_dir) / "jsonl" / f"{split}.jsonl"
-    with (open(data_path) as data_file,
-          h5py.File(Path(work_dir) / split / (utils.CANDIDATES_FILENAME + ".h5")) as candidates_h5):
-        candidates_h5ds = candidates_h5[utils.CANDIDATES_TEXT_H5DS_NAME]
+    # with (open(data_path) as data_file,
+    #       h5py.File(Path(work_dir) / split / (utils.CANDIDATES_FILENAME + ".h5")) as candidates_h5):
+    #     candidates_h5ds = candidates_h5[utils.CANDIDATES_TEXT_H5DS_NAME]
+    #     for i, data_line in enumerate(data_file):
+    #         data = json.loads(data_line)
+    #         if ((lang_pair == "all" or data["langs"] == lang_pair) and
+    #             candidates_h5ds[i][0]):
+    #             data_indices.append(i)
+    with (open(data_path) as data_file):
         for i, data_line in enumerate(data_file):
             data = json.loads(data_line)
-            if ((lang_pair == "all" or data["langs"] == lang_pair) and
-                candidates_h5ds[i][0]):
+            if (lang_pair == "all" or data["langs"] == lang_pair):
                 data_indices.append(i)
+
     return data_indices
 
 
@@ -157,6 +163,7 @@ def main(args):
     total_score_random = 0
     total_score_baseline = 0
     total_score_pruning = 0
+    best_candidate_chosen = 0
     runs_per_metric = [0] * test_scores.shape[0]
     for instance_idx in tqdm(range(test_scores.shape[1])):
         total_score_baseline += test_original_scores[-1, instance_idx].max()
@@ -164,6 +171,7 @@ def main(args):
 
         instance_scores = test_scores[:, instance_idx]
         candidate_idxs = np.arange(train_scores.shape[2])
+        best_candidate_idx = instance_scores[-1].argmax()
 
         for metric_idx in range(instance_scores.shape[0]-1):
             runs_per_metric[metric_idx] += instance_scores.shape[1]
@@ -177,15 +185,17 @@ def main(args):
             candidate_idxs = candidate_idxs[cdf >= args.alpha]
 
         runs_per_metric[-1] += candidate_idxs.size
+        predicted_candidate_idx = candidate_idxs[test_original_scores[-1, instance_idx, candidate_idxs].argmax()]
         total_score_pruning += test_original_scores[-1, instance_idx, candidate_idxs].max()
+        if predicted_candidate_idx == best_candidate_idx:
+            best_candidate_chosen += 1
 
     print(f"Final score -   random: {total_score_random / test_scores.shape[1]}")
     print(f"Final score - baseline: {total_score_baseline / test_scores.shape[1]}")
     print(f"Final score -  pruning: {total_score_pruning / test_scores.shape[1]}")
     for metric_name, num_runs in zip(model_names, runs_per_metric):
         print(f"Metric runs - {metric_name}: {num_runs / test_scores.shape[1]}")
-    # import pdb; pdb.set_trace()
-
+    print(f"Top-1 returned: {best_candidate_chosen / test_scores.shape[1]}")
 
 
 if __name__ == "__main__":
