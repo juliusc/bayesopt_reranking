@@ -4,7 +4,7 @@
 unified_metric:
   class_path: comet.models.UnifiedMetric
   init_args:
-    use_first_layers: 1
+    use_first_layers: null
     # use_first_layers: -1
     remove_unused_layers_from_encoder: false
     train_data: 
