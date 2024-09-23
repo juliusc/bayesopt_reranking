@@ -1,8 +1,12 @@
 #!/usr/bin/bash
 
 . scripts/utils.sh
-sbatch_gpu "cometkiwi-score-train" "python3 scripts/04a-score_comet.py -m Unbabel/wmt22-cometkiwi-da -o computed/train.cometkiwi.jsonl -bs 32"
 
+# prepare data
+sbatch_gpu "cometkiwi-score-train" "python3 scripts/04a-score_comet.py -d data/jsonl/train.jsonl -m Unbabel/wmt22-cometkiwi-da -o data/jsonl/train.cometkiwi.jsonl -bs 32"
+python3 scripts/02-jsonl_to_csv.py data/jsonl/train.cometkiwi.jsonl data/csv/train_cometkiwi.csv
+
+# launch training
 function get_config() {
     mkdir -p models
 
@@ -31,6 +35,6 @@ function get_config() {
     echo ${TMP_CONFIG_DIR}/model.yaml
 }
 
-COMET_CODENAME="skintle"     sbatch_gpu "bogan-S" "comet-train --cfg $(get_config 'BERT' 'sentence-transformers/all-MiniLM-L12-v2' 'bogan-S')"
-COMET_CODENAME="skintle"     sbatch_gpu "bogan-M" "comet-train --cfg $(get_config 'MiniLM' 'microsoft/Multilingual-MiniLM-L12-H384' 'bogan-M')"
-COMET_CODENAME="skintle-acc" sbatch_gpu "bogan-L" "comet-train --cfg $(get_config 'XLM-RoBERTa' 'xlm-roberta-base' 'bogan-L')"
+COMET_CODENAME="riem"     sbatch_gpu "bogan-S" "comet-train --cfg $(get_config 'BERT' 'sentence-transformers/all-MiniLM-L12-v2' 'bogan-S')"
+COMET_CODENAME="riem"     sbatch_gpu "bogan-M" "comet-train --cfg $(get_config 'MiniLM' 'microsoft/Multilingual-MiniLM-L12-H384' 'bogan-M')"
+COMET_CODENAME="riem-acc" sbatch_gpu "bogan-L" "comet-train --cfg $(get_config 'XLM-RoBERTa' 'xlm-roberta-base' 'bogan-L')"
