@@ -4,7 +4,10 @@
 
 # prepare data
 sbatch_gpu "cometkiwi-score-train" "python3 scripts/04a-score_comet.py -d data/jsonl/train.jsonl -m Unbabel/wmt22-cometkiwi-da -o data/jsonl/train.cometkiwi.jsonl -bs 32"
-python3 scripts/02-jsonl_to_csv.py data/jsonl/train.cometkiwi.jsonl data/csv/train_cometkiwi.csv
+# move metric key to score?
+python3 -c "import json; data = [json.loads(x) for x in open('data/jsonl/train.cometkiwi_bak.jsonl', 'r')]; data = [{**v, 'score': v['model']} for v in data]; open('data/jsonl/train.cometkiwi.jsonl', 'w').write('\n'.join([json.dumps(v, ensure_ascii=False) for v in data]))"
+python3 scripts/02-jsonl_to_csv.py "data/jsonl/train.cometkiwi.jsonl"
+
 
 # launch training
 function get_config() {
@@ -20,7 +23,7 @@ function get_config() {
     # should prevent collisions
     mkdir -p tmp
     TMP_CONFIG_DIR=$(mktemp -d -p 'tmp/')
-    cp configs/${COMET_CODENAME}/* ${TMP_CONFIG_DIR}
+    cp configs/riem/* ${TMP_CONFIG_DIR}
 
     cat ${TMP_CONFIG_DIR}/model.yaml \
         | sed "s|TRAIN_DATA_PATH|${TRAIN_DATA}|" \
@@ -35,6 +38,6 @@ function get_config() {
     echo ${TMP_CONFIG_DIR}/model.yaml
 }
 
-COMET_CODENAME="riem"     sbatch_gpu "bogan-S" "comet-train --cfg $(get_config 'BERT' 'sentence-transformers/all-MiniLM-L12-v2' 'bogan-S')"
-COMET_CODENAME="riem"     sbatch_gpu "bogan-M" "comet-train --cfg $(get_config 'MiniLM' 'microsoft/Multilingual-MiniLM-L12-H384' 'bogan-M')"
-COMET_CODENAME="riem-acc" sbatch_gpu "bogan-L" "comet-train --cfg $(get_config 'XLM-RoBERTa' 'xlm-roberta-base' 'bogan-L')"
+sbatch_gpu "bogan-S" "comet-train --cfg $(get_config 'BERT' 'sentence-transformers/all-MiniLM-L12-v2' 'bogan-S')"
+sbatch_gpu "bogan-M" "comet-train --cfg $(get_config 'MiniLM' 'microsoft/Multilingual-MiniLM-L12-H384' 'bogan-M')"
+sbatch_gpu "bogan-L" "comet-train --cfg $(get_config 'XLM-RoBERTa' 'xlm-roberta-base' 'bogan-L')"

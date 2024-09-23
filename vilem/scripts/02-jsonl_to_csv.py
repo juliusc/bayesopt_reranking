@@ -2,11 +2,16 @@ import json
 import csv
 import glob
 import os
+import argparse
+
+args = argparse.ArgumentParser()
+args.add_argument('glob', default="data/jsonl/*.jsonl")
+args = args.parse_args()
 
 os.makedirs("data/csv", exist_ok=True)
 os.makedirs("data/jsonl", exist_ok=True)
 
-for f in glob.glob("data/jsonl/*.jsonl"):
+for f in glob.glob(args.glob):
     print("Check", f, end=" ")
     f = f.split("/")[-1].removesuffix(".jsonl")
     if os.path.exists(f"data/csv/{f}.csv"):
