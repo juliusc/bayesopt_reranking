@@ -3,6 +3,8 @@ import json
 import logging
 import sys
 
+import pandas as pd
+
 from pathlib import Path
 from tqdm import tqdm
 
@@ -100,18 +102,13 @@ def get_data_indices(data_dir, work_dir, split, model_class_name, lang_pair):
     # (some candidates failed due to OOM).
     data_indices = []
     data_path = Path(data_dir) / "jsonl" / f"{split}.jsonl"
-    # with (open(data_path) as data_file,
-    #       h5py.File(Path(work_dir) / split / (utils.CANDIDATES_FILENAME + ".h5")) as candidates_h5):
-    #     candidates_h5ds = candidates_h5[utils.CANDIDATES_TEXT_H5DS_NAME]
-    #     for i, data_line in enumerate(data_file):
-    #         data = json.loads(data_line)
-    #         if ((lang_pair == "all" or data["langs"] == lang_pair) and
-    #             candidates_h5ds[i][0]):
-    #             data_indices.append(i)
-    with (open(data_path) as data_file):
+    with (open(data_path) as data_file,
+          h5py.File(Path(work_dir) / split / (utils.CANDIDATES_FILENAME + ".h5")) as candidates_h5):
+        candidates_h5ds = candidates_h5[utils.CANDIDATES_TEXT_H5DS_NAME]
         for i, data_line in enumerate(data_file):
             data = json.loads(data_line)
-            if (lang_pair == "all" or data["langs"] == lang_pair):
+            if ((lang_pair == "all" or data["langs"] == lang_pair) and
+                candidates_h5ds[i][0]):
                 data_indices.append(i)
 
     return data_indices
@@ -130,6 +127,31 @@ def main(args):
 
     score_names = []
     scores = []
+
+    keep_idxs = []
+    with h5py.File((Path(args.work_dir) / split / utils.CANDIDATES_FILENAME).with_suffix(".h5")) as h5_file:
+        if args.avg_logprob or args.sum_logprob:
+            token_logprobs = h5_file[utils.CANDIDATES_TOKEN_LOGPROBS_H5DS_NAME][:]
+        candidates_h5ds = h5_file[utils.CANDIDATES_TEXT_H5DS_NAME]
+        for instance_idx in range(candidates_h5ds.shape[0]):
+            if candidates_h5ds[instance_idx][0]:
+                keep_idxs.append(instance_idx)
+
+    if args.avg_logprob or args.sum_logprob:
+        avg_logprobs = np.zeros_like(token_logprobs, dtype='float')
+        sum_logprobs = np.zeros_like(token_logprobs, dtype='float')
+        for instance_idx in range(token_logprobs.shape[0]):
+            for candidate_idx in range(token_logprobs.shape[1]):
+                sum_logprob = token_logprobs[instance_idx, candidate_idx].sum()
+                sum_logprobs[instance_idx, candidate_idx] = sum_logprob
+                avg_logprobs[instance_idx, candidate_idx] = sum_logprob / token_logprobs[instance_idx, candidate_idx].size
+        if args.avg_logprob:
+            score_names.append("Average logprob")
+            scores.append(avg_logprobs[data_indices])
+        if args.sum_logprob:
+            score_names.append("Total logprob")
+            scores.append(sum_logprobs[data_indices])
+
     model_names = ([f"{args.model_class_name}-{size}" for size in ("S", "M", "L")] +
                    ["wmt22-cometkiwi-da"])
     for model_name in model_names:
@@ -141,6 +163,7 @@ def main(args):
 
     # Shape of (# of scores, # of instances, # of candidates per instance)
     original_scores = np.stack(scores)
+
     scores = original_scores.copy()
     if args.zero_mean:
         scores -= scores.mean(-1, keepdims=True)
@@ -190,12 +213,25 @@ def main(args):
         if predicted_candidate_idx == best_candidate_idx:
             best_candidate_chosen += 1
 
-    print(f"Final score -   random: {total_score_random / test_scores.shape[1]}")
-    print(f"Final score - baseline: {total_score_baseline / test_scores.shape[1]}")
-    print(f"Final score -  pruning: {total_score_pruning / test_scores.shape[1]}")
-    for metric_name, num_runs in zip(model_names, runs_per_metric):
-        print(f"Metric runs - {metric_name}: {num_runs / test_scores.shape[1]}")
-    print(f"Top-1 returned: {best_candidate_chosen / test_scores.shape[1]}")
+    statistic_names = [
+        "Final score - random",
+        "Final score - baseline",
+        "Final score -  pruning",
+    ]
+    statistic_names += [f"Metric runs - {score_name}" for score_name in score_names]
+
+    results_rows = []
+    results_rows.append([f"Final score - random", total_score_random / test_scores.shape[1]])
+    results_rows.append([f"Final score - baseline", total_score_baseline / test_scores.shape[1]])
+    results_rows.append([f"Final score - pruning", total_score_pruning / test_scores.shape[1]])
+    for score_name, num_runs in zip(score_names, runs_per_metric):
+        results_rows.append([f"Metric runs - {score_name}", num_runs / test_scores.shape[1]])
+    results_rows.append([f"Top-1 returned", best_candidate_chosen / test_scores.shape[1]])
+    results_df = pd.DataFrame(data=results_rows, columns=["Statistic", "Value"])
+    print(results_df.to_string(index=False))
+    # Print just the values for ease of pasting into a spreadsheet
+    # print(results_df["Value"].to_string(index=False))
+
 
 
 if __name__ == "__main__":
@@ -223,6 +259,14 @@ if __name__ == "__main__":
     parser.add_argument(
         "--zero_mean", action="store_true",
         help="Whether to zero-mean each metric ")
+
+    parser.add_argument(
+        "--avg_logprob", action="store_true",
+        help="Whether to use average token log probability as a metric.")
+
+    parser.add_argument(
+        "--sum_logprob", action="store_true",
+        help="Whether to use total token log probability as a metric.")
 
     args = parser.parse_args()
     main(args)
