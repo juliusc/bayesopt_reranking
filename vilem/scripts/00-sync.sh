@@ -12,3 +12,7 @@ rsync -azP --filter=":- .gitignore" --exclude .git/ . euler:/cluster/work/sachan
 
 # scp euler:/cluster/work/sachan/vilem/comet-pruning/models/riem-S.ckpt models/riem-S/model/
 # scp euler:/cluster/work/sachan/vilem/comet-pruning/models/skintle-S*.ckpt models/skintle-S/model/
+
+# scp euler:/cluster/work/sachan/vilem/comet-pruning/models/bogan-S*.ckpt models/bogan-S/model/
+# scp euler:/cluster/work/sachan/vilem/comet-pruning/models/bogan-M*.ckpt models/bogan-M/model/
+# scp euler:/cluster/work/sachan/vilem/comet-pruning/models/bogan-L*.ckpt models/bogan-L/model/

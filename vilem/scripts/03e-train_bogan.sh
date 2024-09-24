@@ -23,7 +23,7 @@ function get_config() {
     # should prevent collisions
     mkdir -p tmp
     TMP_CONFIG_DIR=$(mktemp -d -p 'tmp/')
-    cp configs/riem/* ${TMP_CONFIG_DIR}
+    cp configs/${COMET_CODENAME}/* ${TMP_CONFIG_DIR}
 
     cat ${TMP_CONFIG_DIR}/model.yaml \
         | sed "s|TRAIN_DATA_PATH|${TRAIN_DATA}|" \
@@ -38,6 +38,6 @@ function get_config() {
     echo ${TMP_CONFIG_DIR}/model.yaml
 }
 
-sbatch_gpu "bogan-S" "comet-train --cfg $(get_config 'BERT' 'sentence-transformers/all-MiniLM-L12-v2' 'bogan-S')"
-sbatch_gpu "bogan-M" "comet-train --cfg $(get_config 'MiniLM' 'microsoft/Multilingual-MiniLM-L12-H384' 'bogan-M')"
-sbatch_gpu "bogan-L" "comet-train --cfg $(get_config 'XLM-RoBERTa' 'xlm-roberta-base' 'bogan-L')"
+sbatch_gpu "bogan-S" "comet-train --cfg $(COMET_CODENAME='riem'     get_config 'BERT' 'sentence-transformers/all-MiniLM-L12-v2' 'bogan-S')"
+sbatch_gpu "bogan-M" "comet-train --cfg $(COMET_CODENAME='riem'     get_config 'MiniLM' 'microsoft/Multilingual-MiniLM-L12-H384' 'bogan-M')"
+sbatch_gpu "bogan-L" "comet-train --cfg $(COMET_CODENAME='riem-acc' get_config 'XLM-RoBERTa' 'xlm-roberta-base' 'bogan-L')"
