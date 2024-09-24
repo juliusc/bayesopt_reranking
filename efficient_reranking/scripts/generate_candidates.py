@@ -1,5 +1,6 @@
 import argparse
 import json
+import logging
 
 from pathlib import Path
 
@@ -29,8 +30,7 @@ def main(args):
 
     output_path_base = work_dir / (utils.CANDIDATES_FILENAME)
     output_path = output_path_base.with_suffix(".h5")
-    logger = utils.get_logger(
-        "generate_candidates.py", output_path_base.with_suffix(".log"))
+    utils.configure_logger("generate_candidates.py", output_path_base.with_suffix(".log"))
 
     data_path = Path(args.data_dir) / "jsonl" / f"{args.split}.jsonl"
     data_lines = open(data_path).readlines()
@@ -59,7 +59,7 @@ def main(args):
                 utils.H5_VLEN_FLOAT_DTYPE
             )
 
-        logger.info(f"Generating candidates...")
+        logging.info(f"Generating candidates...")
 
         for i, data_line in enumerate(tqdm(data_lines[:args.subset])):
             data = json.loads(data_line)
@@ -78,7 +78,7 @@ def main(args):
                         output_scores=True,
                         return_dict_in_generate=True)
                 except torch.OutOfMemoryError:
-                    logger.info(f"Instance {i} failed with out-of-memory error. Skipping.")
+                    logging.info(f"Instance {i} failed with out-of-memory error. Skipping.")
                     continue
 
             texts = tokenizer.batch_decode(result.sequences, skip_special_tokens=True)
@@ -101,7 +101,7 @@ def main(args):
                 seq_length = (result.sequences[j] != tokenizer.pad_token_id).sum() - 2
                 token_logprobs_h5[i, j] = logprobs[j][:seq_length].cpu().numpy()
 
-    logger.info(f"Finished.")
+    logging.info(f"Finished.")
 
 
 

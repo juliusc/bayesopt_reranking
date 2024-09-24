@@ -26,6 +26,10 @@ for MODEL_CLASS in {riem,skintle}; do
 done
 
 # 3. Fit multivariate gaussian metamodel
-MODEL_CLASS=riem
-python efficient_reranking/scripts/run_mv_gaussian.py $DATA_DIR $WORK_DIR $MODEL_CLASS en-cs --zero_mean
+MODEL_CLASS=skintle
+python efficient_reranking/scripts/run_mv_gaussian.py $DATA_DIR $WORK_DIR $MODEL_CLASS cs-en --zero_mean
+
+# ?. Get embeddings
+# COMET
+python efficient_reranking/scripts/get_comet_embeddings.py $DATA_DIR dev $WORK_DIR --comet_path=comet_models/skintle-S/model/skintle-S-v1.ckpt
 ```

@@ -1,5 +1,6 @@
 import argparse
 import json
+import logging
 
 from pathlib import Path
 from tqdm import tqdm
@@ -43,9 +44,9 @@ def main(args):
         raise ValueError(f"Output file {output_path} already exists.")
 
     # TODO (julius): This logs to stdout twice for some reason
-    logger = utils.get_logger("score_comet.py", output_path_base.with_suffix(".log"))
+    utils.configure_logger("score_comet.py", output_path_base.with_suffix(".log"))
 
-    logger.info(f"Evaluating candidates with COMET...")
+    logging.info(f"Evaluating candidates with COMET...")
 
     candidates_path = work_dir / (utils.CANDIDATES_FILENAME + ".h5")
     data_path = Path(args.data_dir) / "jsonl" / f"{args.split}.jsonl"
@@ -65,7 +66,7 @@ def main(args):
 
         data_idxs = []
         inputs = []
-        logger.info("Preparing inputs...")
+        logging.info("Preparing inputs...")
         for i, data_line in enumerate(tqdm(data_lines)):
             if scores_h5ds[i, 0] and not args.overwrite:
                 continue
@@ -81,10 +82,10 @@ def main(args):
 
         if not inputs:
             return
-        logger.info("Scoring...")
+        logging.info("Scoring...")
         with torch.no_grad():
             result = model.predict(samples=inputs, batch_size=args.comet_batch_size, mc_dropout=args.mc_dropout)
-        logger.info("Writing results to file...")
+        logging.info("Writing results to file...")
         scores = np.matrix(result.scores).reshape(-1, scores_h5ds.shape[1])
 
         for result_idx, data_idx in enumerate(data_idxs):
@@ -109,7 +110,7 @@ def main(args):
         #     result = model.predict(samples=data, batch_size=128)
         #     scores_h5ds[i] = result.scores
 
-    logger.info(f"Finished.")
+    logging.info(f"Finished.")
 
 
 if __name__ == "__main__":

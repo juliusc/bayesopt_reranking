@@ -43,18 +43,19 @@ CANDIDATES_TOKEN_LOGPROBS_H5DS_NAME = "token_logprobs"
 COMET_SCORES_FILENAME_BASE = "scores_comet_"
 COMET_SCORES_H5DS_NAME = "scores"
 
+EMBEDDINGS_FILENAME_BASE = "embeddings_"
+EMBEDDINGS_H5DS_NAME = "embeddings"
 
-def get_logger(name, output_filename):
+SIMILARITIES_FILENAME_BASE = "similarities_"
+SIMILARITIES_H5DS_NAME = "similarities"
+
+
+def configure_logger(name, output_filename):
     file_handler = logging.FileHandler(output_filename, mode='w')
     stream_handler = logging.StreamHandler(sys.stdout)
-    logger = logging.getLogger(name)
-    formatter = logging.Formatter(
-        "%(asctime)s | %(levelname)s | %(name)s | %(message)s",
-        "%Y-%m-%d %H:%M:%S")
-    for h in [file_handler]:
-        h.setLevel(logging.INFO)
-        h.setFormatter(formatter)
-        logger.addHandler(h)
-    logger.setLevel(logging.INFO)
-    return logger
-
+    logging.basicConfig(
+        force=True,
+        level=logging.INFO,
+        datefmt="%Y-%m-%d %H:%M:%S",
+        format="%(asctime)s | %(levelname)s | %(name)s | %(message)s",
+        handlers=[file_handler, stream_handler])
