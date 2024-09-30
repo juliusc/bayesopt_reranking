@@ -40,7 +40,7 @@ def main(args):
         output_path_base = work_dir / (utils.COMET_SCORES_FILENAME_BASE + comet_base_name + ".h5")
     output_path = output_path_base.with_suffix(".h5")
 
-    if output_path.exists():
+    if output_path.exists() and not args.overwrite:
         raise ValueError(f"Output file {output_path} already exists.")
 
     # TODO (julius): This logs to stdout twice for some reason
@@ -52,7 +52,7 @@ def main(args):
     data_path = Path(args.data_dir) / "jsonl" / f"{args.split}.jsonl"
     data_lines = open(data_path).readlines()
 
-    with (h5py.File(output_path, "a") as output_file,
+    with (h5py.File(output_path, "w") as output_file,
           h5py.File(candidates_path) as candidates_file):
         candidates_text_h5ds = candidates_file[utils.CANDIDATES_TEXT_H5DS_NAME]
         if utils.COMET_SCORES_H5DS_NAME in output_file:
@@ -64,19 +64,18 @@ def main(args):
                 float
             )
 
-        data_idxs = []
         inputs = []
+        all_num_cands = []
         logging.info("Preparing inputs...")
         for i, data_line in enumerate(tqdm(data_lines)):
-            if scores_h5ds[i, 0] and not args.overwrite:
-                continue
             data = json.loads(data_line)
             src = data["src"]
-            tgts = [candidates_text_h5ds[i, j].decode() for j in range(candidates_text_h5ds.shape[1])]
-            # Skip missing candidates
-            if all(not tgt for tgt in tgts):
-                continue
-            data_idxs.append(i)
+            tgts = []
+            for j in range(candidates_text_h5ds.shape[1]):
+                if not candidates_text_h5ds[i, j]:
+                    break
+                tgts.append(candidates_text_h5ds[i, j].decode())
+            all_num_cands.append(len(tgts))
             for tgt in tgts:
                 inputs.append({"src": src, "mt": tgt})
 
@@ -86,10 +85,13 @@ def main(args):
         with torch.no_grad():
             result = model.predict(samples=inputs, batch_size=args.comet_batch_size, mc_dropout=args.mc_dropout)
         logging.info("Writing results to file...")
-        scores = np.matrix(result.scores).reshape(-1, scores_h5ds.shape[1])
 
-        for result_idx, data_idx in enumerate(data_idxs):
-            scores_h5ds[data_idx] = scores[result_idx]
+        seen = 0
+        for i, num_cands in enumerate(all_num_cands):
+            scores_row = np.zeros(candidates_text_h5ds.shape[1])
+            scores_row[:num_cands] = result.scores[seen:seen+num_cands]
+            scores_h5ds[i] = scores_row
+            seen += num_cands
 
         # # Old code that didn't pass all inputs into COMET at once, which is
         # # much faster
@@ -140,6 +142,9 @@ if __name__ == "__main__":
 
     parser.add_argument(
         "--mc_dropout", action="store_true", help="Activate MC dropout.")
+
+    parser.add_argument(
+        "--overwrite", action="store_true", help="Whether to overwrite existing data.")
 
 
     args = parser.parse_args()
