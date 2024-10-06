@@ -171,6 +171,8 @@ def main(args):
     # Print just the values for ease of pasting into a spreadsheet
     print(results_df["Value"].to_string(index=False))
 
+    # print((np.array(runs_per_metric) * np.array([0.7, 1.3, 2.7, 5.7]) / len(all_test_scores)).sum())
+
 
 
 if __name__ == "__main__":

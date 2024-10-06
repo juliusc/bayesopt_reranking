@@ -111,81 +111,96 @@ def main(args):
 
     baseline_max_total = 0
     baseline_random_total = defaultdict(int)
-    baseline_highest_logprob_total = defaultdict(int)
     bandit_total = defaultdict(int)
 
+    # corrs = []
+    # for scores in all_scores:
+    #     corrs.append(pearsonr(scores[:, PROXY_METRIC_IDX], scores[:, -1]).statistic)
+    #     # scores = (scores - scores.mean(axis=0)) / scores.std(axis=0)
+    #     # corrs.append(np.cov(scores[:, [2, -1]].T)[0, 1])
+    # metrics_corr = np.mean(corrs)
+
     for scores, sims, counts, logprobs in tqdm(zip(all_scores, all_sims, all_counts, all_logprobs)):
-        scores = scores[:, -1]
-        # For sampling without replacement for the baseline
+        m_scores = scores[:, args.metric_idx]
+        m_scores -= m_scores.mean()
+        m_scores /= m_scores.std()
+        m_star_scores = scores[:, -1]
+
         candidate_idxs = []
         for i in range(counts.size):
             candidate_idxs.extend([i] * int(counts[i]))
         np.random.shuffle(candidate_idxs)
 
-        logprob_sorted_idxs = (-logprobs[:scores.size]).argsort()
+        baseline_max_total += m_star_scores.max()
 
-        baseline_max_total += scores.max()
-
-        # highest_logprob_idxs = list(list(zip(*sorted(zip(-np.array(logprobs), range(len(scores))))))[1][:MAX_EVALS])
-        # baseline_total += scores[highest_logprob_idxs].max()
-
-        all_idxs = np.arange(scores.shape[0])
-        known_idxs = list(np.random.choice(scores.shape[0], min(INITIAL_SIZE, all_idxs.shape[0]), replace=False))
+        all_idxs = np.arange(m_star_scores.shape[0])
+        # known_idxs = list(np.random.choice(m_star_scores.shape[0], min(INITIAL_SIZE, all_idxs.shape[0]), replace=False))
+        known_idxs = list(list(zip(*sorted(zip(-m_scores, all_idxs))))[1][:INITIAL_SIZE])
         unknown_idxs = [x for x in all_idxs if x not in known_idxs]
-        prior_var = np.var(scores[known_idxs])
 
         rbf_cov = np.exp(-(1 - sims.reshape(-1)) / (2 * args.bandwidth ** 2)).reshape(all_idxs.size, all_idxs.size)
 
-        # known_scores = scores[known_idxs]
-        # fixed_mean = known_scores.mean()
-        # fixed_std = np.std(known_scores)
-
         while len(known_idxs) < min(MAX_EVALS, all_idxs.shape[0]):
-            baseline_random_total[len(known_idxs)] += scores[candidate_idxs[:len(known_idxs)]].max()
-            baseline_highest_logprob_total[len(known_idxs)] += scores[logprob_sorted_idxs[:len(known_idxs)]].max()
-            bandit_total[len(known_idxs)] += scores[known_idxs].max()
+            baseline_random_total[len(known_idxs)] += m_star_scores[candidate_idxs[:len(known_idxs)]].max()
+            bandit_total[len(known_idxs)] += m_star_scores[known_idxs].max()
+            # print(len(known_idxs), m_star_scores[known_idxs].max())
 
-            known_scores = scores[known_idxs]
-            known_scores -= known_scores.mean()
-            known_scores /= np.std(known_scores)
-            # known_scores -= fixed_mean
-            # known_scores /= fixed_std
+            known_scores_m_1 = m_scores
+            known_scores_m_1 -= known_scores_m_1.mean()
+            known_scores_m_1 /= np.std(known_scores_m_1)
+
+            known_scores_m_star = m_star_scores[known_idxs]
+            known_scores_m_star -= known_scores_m_star.mean()
+            known_scores_m_star /= np.std(known_scores_m_star)
+
+            metrics_corr = pearsonr(known_scores_m_1[known_idxs], known_scores_m_star).statistic
+
+            known_scores = np.concatenate([known_scores_m_1, known_scores_m_star])
+
             unknown_unknown_cov = rbf_cov[unknown_idxs][:, unknown_idxs]
-            known_unknown_cov = rbf_cov[known_idxs][:, unknown_idxs]
-            known_known_cov = rbf_cov[known_idxs][:, known_idxs]
-            prior_cov = 0
-            try:
-                inverse_known_known_plus_prior = np.linalg.inv(known_known_cov)
-                term_1 = np.matmul(inverse_known_known_plus_prior, known_unknown_cov)
-                term_2 = np.matmul(known_unknown_cov.T, term_1)
-                posterior_cov = unknown_unknown_cov - term_2
-                mean_term_1 = np.matmul(inverse_known_known_plus_prior, known_scores)
-                posterior_mean = np.matmul(known_unknown_cov.T, mean_term_1)
-                posterior_var = posterior_cov.diagonal()
-                best_score = known_scores.max()
-                cdf = (norm.cdf(best_score, loc=posterior_mean, scale=posterior_var ** 0.5))
-                best_unknown_idx_idx = (1 - cdf).argmax()
-                known_idxs.append(unknown_idxs[best_unknown_idx_idx])
-                del unknown_idxs[best_unknown_idx_idx]
-            except Exception as e:
-                print("FAIL")
-                break
 
-        # while len(known_idxs) < min(MAX_EVALS, all_idxs.shape[0]):
-        #     baseline_random_total[len(known_idxs)] += scores[candidate_idxs[:len(known_idxs)]].max()
-        #     baseline_highest_logprob_total[len(known_idxs)] += scores[logprob_sorted_idxs[:len(known_idxs)]].max()
-        #     bandit_total[len(known_idxs)] += scores[known_idxs].max()
-        #     known_idxs.append(0)
+            # known_unknown_cov_m_1 = rbf_cov[:, unknown_idxs] * metrics_corr
+            # known_unknown_cov_m_star = rbf_cov[known_idxs][:, unknown_idxs]
+            # known_unknown_cov = np.concatenate([known_unknown_cov_m_1, known_unknown_cov_m_star])
+
+            # known_known_cov_m_star = rbf_cov[known_idxs][:, known_idxs]
+            # known_known_cov_m_1_m_star = rbf_cov[known_idxs] * metrics_corr
+            # known_known_cov_m_1 = rbf_cov
+            # known_known_cov = np.concatenate([np.concatenate([known_known_cov_m_1, known_known_cov_m_1_m_star]), np.concatenate([known_known_cov_m_1_m_star.T, known_known_cov_m_star])], axis=1)
+
+            known_scores = np.concatenate([known_scores_m_1[unknown_idxs], known_scores_m_star])
+
+            known_unknown_cov_m_1 = rbf_cov[unknown_idxs][:, unknown_idxs] * metrics_corr
+            known_unknown_cov_m_star = rbf_cov[known_idxs][:, unknown_idxs]
+            known_unknown_cov = np.concatenate([known_unknown_cov_m_1, known_unknown_cov_m_star])
+
+            known_known_cov_m_star = rbf_cov[known_idxs][:, known_idxs]
+            known_known_cov_m_1_m_star = rbf_cov[known_idxs][:, unknown_idxs] * metrics_corr
+            known_known_cov_m_1 = rbf_cov[unknown_idxs][:, unknown_idxs]
+            known_known_cov = np.concatenate([np.concatenate([known_known_cov_m_1, known_known_cov_m_1_m_star]), np.concatenate([known_known_cov_m_1_m_star.T, known_known_cov_m_star])], axis=1)
+
+            inverse_known_known_plus_prior = np.linalg.inv(known_known_cov)
+            term_1 = np.matmul(inverse_known_known_plus_prior, known_unknown_cov)
+            term_2 = np.matmul(known_unknown_cov.T, term_1)
+            posterior_cov = unknown_unknown_cov - term_2
+            mean_term_1 = np.matmul(inverse_known_known_plus_prior, known_scores)
+            posterior_mean = np.matmul(known_unknown_cov.T, mean_term_1)
+            posterior_var = posterior_cov.diagonal()
+            best_score = known_scores.max()
+            cdf = (norm.cdf(best_score, loc=posterior_mean, scale=posterior_var ** 0.5))
+            best_unknown_idx_idx = (1 - cdf).argmax()
+            known_idxs.append(unknown_idxs[best_unknown_idx_idx])
+            del unknown_idxs[best_unknown_idx_idx]
 
         for total_cands in range(len(known_idxs), MAX_EVALS + 1):
-            baseline_random_total[total_cands] += scores[candidate_idxs[:total_cands]].max()
-            baseline_highest_logprob_total[total_cands] += scores[logprob_sorted_idxs[:total_cands]].max()
-            bandit_total[total_cands] += scores[known_idxs].max()
+            baseline_random_total[total_cands] += m_star_scores[candidate_idxs[:total_cands]].max()
+            bandit_total[total_cands] += m_star_scores[known_idxs].max()
+            # print(total_cands, m_star_scores[known_idxs].max())
 
     print(baseline_max_total / len(all_scores))
-    for k in bandit_total:
+    for k in sorted(bandit_total):
         if k % 10 == 0:
-            print(k, bandit_total[k] / len(all_scores), baseline_random_total[k] / len(all_scores), baseline_highest_logprob_total[k] / len(all_scores))
+            print(k, bandit_total[k] / len(all_scores), baseline_random_total[k] / len(all_scores))
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -209,16 +224,14 @@ if __name__ == "__main__":
     parser.add_argument(
         "bandwidth", type=float, help="RBF bandwidth parameter.")
 
-    # parser.add_argument(
-    #     "batch_size", type=int, help="Bayesopt update batch size.")
+    parser.add_argument(
+        "metric_idx", type=int, help="")
 
     parser.add_argument(
         "--alpha", type=float, default=0.2, help="Confidence threshold.")
 
     parser.add_argument(
         "--seed", type=int, default=0, help="Random seed.")
-
-
 
     args = parser.parse_args()
     main(args)

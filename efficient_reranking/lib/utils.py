@@ -51,6 +51,10 @@ EMBEDDINGS_H5DS_NAME = "embeddings"
 SIMILARITIES_FILENAME_BASE = "similarities_"
 SIMILARITIES_H5DS_NAME = "similarities"
 
+LOGPROBS_FILENAME_BASE = "logprobs"
+SUM_LOGPROBS_H5DS_NAME = "sum"
+AVG_LOGPROBS_H5DS_NAME = "avg"
+
 
 def configure_logger(name, output_filename):
     file_handler = logging.FileHandler(output_filename, mode='w')
