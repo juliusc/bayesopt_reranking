@@ -69,7 +69,7 @@ def load_scores_and_similarities(
     num_metrics = len(model_names)
     with (h5py.File((split_work_dir / utils.CANDIDATES_FILENAME).with_suffix(".h5")) as cand_h5,
           h5py.File((split_work_dir / utils.LOGPROBS_FILENAME_BASE).with_suffix(".h5")) as logprobs_h5,
-          h5py.File((split_work_dir / (utils.SIMILARITIES_FILENAME_BASE + "_cosine")).with_suffix(".h5")) as sim_h5):
+          h5py.File((split_work_dir / (utils.SIMILARITIES_FILENAME_BASE + "cosine")).with_suffix(".h5")) as sim_h5):
         counts_h5ds = cand_h5[utils.CANDIDATES_COUNTS_H5DS_NAME]
         sim_h5ds = sim_h5[utils.SIMILARITIES_H5DS_NAME]
 
@@ -103,16 +103,44 @@ def main(args):
     np.random.seed(args.seed)
     work_dir = Path(args.work_dir)
 
+    output_dir = work_dir / args.split / "gp_results"
+    output_dir.mkdir(parents=True, exist_ok=True)
+    output_filename = output_dir / f"{args.lang_pair}_{args.bandwidth}_{args.batch_size}.json"
+
     all_scores, all_sims, all_counts, all_logprobs = load_scores_and_similarities(
         args.data_dir, args.work_dir, args.split, args.model_class_name)
 
     INITIAL_SIZE = 10
     MAX_EVALS = 200
 
-    baseline_max_total = 0
-    baseline_random_total = defaultdict(int)
-    baseline_highest_logprob_total = defaultdict(int)
-    bandit_total = defaultdict(int)
+    output_h5 = h5py.File(output_filename)
+    for method in ["random", "random_deduped", "logprob_first", "bayesopt"]:
+        output_h5.create_dataset(f"{method}_total", (MAX_EVALS,), float)
+        output_h5.create_dataset(f"{method}_best_retrieved", (MAX_EVALS,), int)
+        output_h5.create_dataset(f"{method}_scores", (MAX_EVALS, len(all_scores)), float)
+
+    log_data = {
+        "num_instances": 0,
+        "baseline_min_total": 0,
+        "baseline_max_total": 0,
+        "baseline_random_total": defaultdict(int),
+        "baseline_random_deduped_total": defaultdict(int),
+        "baseline_hill_climbing_total": defaultdict(int),
+        "baseline_highest_logprob_total": defaultdict(int),
+        "bandit_total": defaultdict(int),
+        "baseline_random_best_retrieved": defaultdict(int),
+        "baseline_random_deduped_best_retrieved": defaultdict(int),
+        "baseline_hill_climbing_best_retrieved": defaultdict(int),
+        "baseline_highest_logprob_best_retrieved": defaultdict(int),
+        "bandit_best_retrieved": defaultdict(int),
+        "baseline_random_scores": defaultdict(list),
+        "baseline_random_deduped_scores": defaultdict(list),
+        "baseline_hill_climbing_scores": defaultdict(list),
+        "baseline_highest_logprob_scores": defaultdict(list),
+        "bandit_scores": defaultdict(list)
+    }
+
+    all_scores = all_scores[:10]
 
     for scores, sims, counts, logprobs in tqdm(zip(all_scores, all_sims, all_counts, all_logprobs)):
         scores = scores[:, -1]
@@ -122,28 +150,48 @@ def main(args):
             candidate_idxs.extend([i] * int(counts[i]))
         np.random.shuffle(candidate_idxs)
 
+        random_deduped_idxs = list(dict.fromkeys(candidate_idxs))
+
         logprob_sorted_idxs = (-logprobs[:scores.size]).argsort()
 
-        baseline_max_total += scores.max()
+        log_data["num_instances"] += 1
+        log_data["baseline_min_total"] += scores.min()
+        log_data["baseline_max_total"] += scores.max()
+
+        best_idx = scores.argmax()
 
         # highest_logprob_idxs = list(list(zip(*sorted(zip(-np.array(logprobs), range(len(scores))))))[1][:MAX_EVALS])
         # baseline_total += scores[highest_logprob_idxs].max()
 
         all_idxs = np.arange(scores.shape[0])
         known_idxs = list(np.random.choice(scores.shape[0], min(INITIAL_SIZE, all_idxs.shape[0]), replace=False))
+        # known_idxs = candidate_idxs[:INITIAL_SIZE]
         unknown_idxs = [x for x in all_idxs if x not in known_idxs]
-        prior_var = np.var(scores[known_idxs])
+
+        # For hill climbing baseline
+        hc_known_idxs = list(known_idxs)
+        hc_unknown_idxs = list(unknown_idxs)
 
         rbf_cov = np.exp(-(1 - sims.reshape(-1)) / (2 * args.bandwidth ** 2)).reshape(all_idxs.size, all_idxs.size)
 
-        # known_scores = scores[known_idxs]
-        # fixed_mean = known_scores.mean()
-        # fixed_std = np.std(known_scores)
-
         while len(known_idxs) < min(MAX_EVALS, all_idxs.shape[0]):
-            baseline_random_total[len(known_idxs)] += scores[candidate_idxs[:len(known_idxs)]].max()
-            baseline_highest_logprob_total[len(known_idxs)] += scores[logprob_sorted_idxs[:len(known_idxs)]].max()
-            bandit_total[len(known_idxs)] += scores[known_idxs].max()
+            log_data["baseline_random_total"][len(known_idxs)] += scores[candidate_idxs[:len(known_idxs)]].max()
+            log_data["baseline_random_deduped_total"][len(known_idxs)] += scores[random_deduped_idxs[:len(known_idxs)]].max()
+            log_data["baseline_hill_climbing_total"][len(known_idxs)] += scores[hc_known_idxs].max()
+            log_data["baseline_highest_logprob_total"][len(known_idxs)] += scores[logprob_sorted_idxs[:len(known_idxs)]].max()
+            log_data["bandit_total"][len(known_idxs)] += scores[known_idxs].max()
+
+            log_data["baseline_random_best_retrieved"][len(known_idxs)] += int(candidate_idxs[scores[candidate_idxs[:len(known_idxs)]].argmax()] == best_idx)
+            log_data["baseline_random_deduped_best_retrieved"][len(known_idxs)] += int(random_deduped_idxs[scores[random_deduped_idxs[:len(known_idxs)]].argmax()] == best_idx)
+            log_data["baseline_hill_climbing_best_retrieved"][len(known_idxs)] += int(hc_known_idxs[scores[hc_known_idxs[:len(hc_known_idxs)]].argmax()] == best_idx)
+            log_data["baseline_highest_logprob_best_retrieved"][len(known_idxs)] += int(logprob_sorted_idxs[scores[logprob_sorted_idxs[:len(known_idxs)]].argmax()] == best_idx)
+            log_data["bandit_best_retrieved"][len(known_idxs)] += int(known_idxs[scores[known_idxs].argmax()] == best_idx)
+
+            log_data["baseline_random_scores"][len(known_idxs)].append(scores[candidate_idxs[:len(known_idxs)]].max())
+            log_data["baseline_random_deduped_scores"][len(known_idxs)].append(scores[random_deduped_idxs[:len(known_idxs)]].max())
+            log_data["baseline_hill_climbing_scores"][len(known_idxs)].append(scores[hc_known_idxs].max())
+            log_data["baseline_highest_logprob_scores"][len(known_idxs)].append(scores[logprob_sorted_idxs[:len(known_idxs)]].max())
+            log_data["bandit_scores"][len(known_idxs)].append(scores[known_idxs].max())
 
             known_scores = scores[known_idxs]
             known_scores -= known_scores.mean()
@@ -154,22 +202,40 @@ def main(args):
             known_unknown_cov = rbf_cov[known_idxs][:, unknown_idxs]
             known_known_cov = rbf_cov[known_idxs][:, known_idxs]
             prior_cov = 0
+
+            inverse_known_known_plus_prior = np.linalg.inv(known_known_cov)
+            term_1 = np.matmul(inverse_known_known_plus_prior, known_unknown_cov)
+            term_2 = np.matmul(known_unknown_cov.T, term_1)
+            posterior_cov = unknown_unknown_cov - term_2
+            mean_term_1 = np.matmul(inverse_known_known_plus_prior, known_scores)
+            posterior_mean = np.matmul(known_unknown_cov.T, mean_term_1)
+            posterior_var = posterior_cov.diagonal()
+            best_score = known_scores.max()
+            cdf = (norm.cdf(best_score, loc=posterior_mean, scale=posterior_var ** 0.5))
+            # best_unknown_idx_idx = (1 - cdf).argmax()
+            # Probability of improvement acquisition function
             try:
-                inverse_known_known_plus_prior = np.linalg.inv(known_known_cov)
-                term_1 = np.matmul(inverse_known_known_plus_prior, known_unknown_cov)
-                term_2 = np.matmul(known_unknown_cov.T, term_1)
-                posterior_cov = unknown_unknown_cov - term_2
-                mean_term_1 = np.matmul(inverse_known_known_plus_prior, known_scores)
-                posterior_mean = np.matmul(known_unknown_cov.T, mean_term_1)
-                posterior_var = posterior_cov.diagonal()
-                best_score = known_scores.max()
-                cdf = (norm.cdf(best_score, loc=posterior_mean, scale=posterior_var ** 0.5))
-                best_unknown_idx_idx = (1 - cdf).argmax()
-                known_idxs.append(unknown_idxs[best_unknown_idx_idx])
-                del unknown_idxs[best_unknown_idx_idx]
-            except Exception as e:
-                print("FAIL")
-                break
+                best_idxs = np.array(unknown_idxs)[np.argpartition(cdf, min(args.batch_size, len(unknown_idxs)-1))[:args.batch_size]]
+            except:
+                import pdb; pdb.set_trace()
+
+            # Expected improvement acquisition function
+            # ei = ((posterior_mean * norm.cdf(best_score, loc=posterior_mean, scale=posterior_var ** 0.5)) +
+            #       posterior_var ** 0.5 * norm.pdf(best_score, loc=posterior_mean, scale=posterior_var ** 0.5))
+            z = (best_score - posterior_mean) / (posterior_var ** 0.5)
+            ei = (
+                posterior_var ** 0.5 *
+                (z * norm.cdf(z) + norm.pdf(z))
+            )
+            best_idxs = np.array(unknown_idxs)[np.argpartition(ei, min(args.batch_size, len(unknown_idxs)-1))[:args.batch_size]]
+
+            known_idxs = known_idxs + list(best_idxs)
+            unknown_idxs = [x for x in all_idxs if x not in known_idxs]
+
+            hc_best_idx = hc_known_idxs[scores[hc_known_idxs].argmax()]
+            best_hc_idxs = np.array(hc_unknown_idxs)[np.argpartition(-sims[hc_best_idx][hc_unknown_idxs], min(args.batch_size, len(unknown_idxs)-1))[:args.batch_size]]
+            hc_known_idxs = hc_known_idxs + list(best_hc_idxs)
+            hc_unknown_idxs = [x for x in all_idxs if x not in hc_known_idxs]
 
         # while len(known_idxs) < min(MAX_EVALS, all_idxs.shape[0]):
         #     baseline_random_total[len(known_idxs)] += scores[candidate_idxs[:len(known_idxs)]].max()
@@ -178,14 +244,48 @@ def main(args):
         #     known_idxs.append(0)
 
         for total_cands in range(len(known_idxs), MAX_EVALS + 1):
-            baseline_random_total[total_cands] += scores[candidate_idxs[:total_cands]].max()
-            baseline_highest_logprob_total[total_cands] += scores[logprob_sorted_idxs[:total_cands]].max()
-            bandit_total[total_cands] += scores[known_idxs].max()
+            if total_cands % args.batch_size == 0:
+                log_data["baseline_random_total"][total_cands] += scores[candidate_idxs[:total_cands]].max()
+                log_data["baseline_random_deduped_total"][total_cands] += scores[random_deduped_idxs[:total_cands]].max()
+                log_data["baseline_hill_climbing_total"][total_cands] += scores[hc_known_idxs].max()
+                log_data["baseline_highest_logprob_total"][total_cands] += scores[logprob_sorted_idxs[:total_cands]].max()
+                log_data["bandit_total"][total_cands] += scores[known_idxs].max()
 
-    print(baseline_max_total / len(all_scores))
-    for k in bandit_total:
-        if k % 10 == 0:
-            print(k, bandit_total[k] / len(all_scores), baseline_random_total[k] / len(all_scores), baseline_highest_logprob_total[k] / len(all_scores))
+                log_data["baseline_random_best_retrieved"][total_cands] += int(candidate_idxs[scores[candidate_idxs[:total_cands]].argmax()] == best_idx)
+                log_data["baseline_random_deduped_best_retrieved"][total_cands] += int(random_deduped_idxs[scores[random_deduped_idxs[:total_cands]].argmax()] == best_idx)
+                log_data["baseline_hill_climbing_best_retrieved"][total_cands] += int(hc_known_idxs[scores[hc_known_idxs].argmax()] == best_idx)
+                log_data["baseline_highest_logprob_best_retrieved"][total_cands] += int(logprob_sorted_idxs[scores[logprob_sorted_idxs[:total_cands]].argmax()] == best_idx)
+                log_data["bandit_best_retrieved"][total_cands] += int(known_idxs[scores[known_idxs].argmax()] == best_idx)
+
+                log_data["baseline_random_scores"][total_cands].append(scores[candidate_idxs[:len(known_idxs)]].max())
+                log_data["baseline_random_deduped_scores"][total_cands].append(scores[random_deduped_idxs[:len(known_idxs)]].max())
+                log_data["baseline_hill_climbing_scores"][total_cands].append(scores[hc_known_idxs].max())
+                log_data["baseline_highest_logprob_scores"][total_cands].append(scores[logprob_sorted_idxs[:len(known_idxs)]].max())
+                log_data["bandit_scores"][total_cands].append(scores[known_idxs].max())
+
+    with open(output_filename, "w") as f:
+        f.write(json.dumps(log_data))
+
+    import pdb; pdb.set_trace()
+
+    # print(log_data["baseline_max_total"] / len(all_scores))
+    # for k in log_data["bandit_total"]:
+    #     print(k,
+    #             log_data["bandit_total"][k] / log_data["num_instances"],
+    #             log_data["baseline_random_total"][k] / log_data["num_instances"],
+    #             log_data["baseline_random_deduped_total"][k] / log_data["num_instances"],
+    #             log_data["baseline_hill_climbing_total"][k] / log_data["num_instances"],
+    #             log_data["baseline_highest_logprob_total"][k] / log_data["num_instances"])
+
+
+    # for k in log_data["bandit_total"]:
+    #     print(k,
+    #             log_data["bandit_best_retrieved"][k] / log_data["num_instances"],
+    #             log_data["baseline_random_best_retrieved"][k] / log_data["num_instances"],
+    #             log_data["baseline_random_deduped_best_retrieved"][k] / log_data["num_instances"],
+    #             log_data["baseline_hill_climbing_best_retrieved"][k] / log_data["num_instances"],
+    #             log_data["baseline_highest_logprob_best_retrieved"][k] / log_data["num_instances"])
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -209,16 +309,14 @@ if __name__ == "__main__":
     parser.add_argument(
         "bandwidth", type=float, help="RBF bandwidth parameter.")
 
-    # parser.add_argument(
-    #     "batch_size", type=int, help="Bayesopt update batch size.")
+    parser.add_argument(
+        "batch_size", type=int, help="Bayesopt update batch size.")
 
     parser.add_argument(
         "--alpha", type=float, default=0.2, help="Confidence threshold.")
 
     parser.add_argument(
         "--seed", type=int, default=0, help="Random seed.")
-
-
 
     args = parser.parse_args()
     main(args)
