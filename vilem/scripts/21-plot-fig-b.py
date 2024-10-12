@@ -21,9 +21,10 @@ plt.figure(figsize=(4, 3))
 plt.gca().set_clip_on(False)
 
 for data_i, (data, bs) in enumerate([(data_2, 2), (data_5, 5), (data_10, 10)]):
-    data_x = [i for i,x in enumerate(data[f'bayesopt_{TYPE}']) if x >= 0.1]
+    # skip the first point at n=10 because that's just initialization
+    data_x = [i for i,x in enumerate(data[f'bayesopt_{TYPE}']) if x >= 0.1 and i > 10]
     data_y_bs1 = [x for i,x in enumerate(data_1[f'bayesopt_{TYPE}']) if i in data_x]
-    data_y = [x for i,x in enumerate(data[f'bayesopt_{TYPE}']) if x >= 0.1]
+    data_y = [x for i,x in enumerate(data[f'bayesopt_{TYPE}']) if i in data_x]
     #  ({np.average(data_y):.4f})
     plt.plot(
         data_x,
