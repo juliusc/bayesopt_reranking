@@ -22,7 +22,7 @@ _, axs = plt.subplots(nrows=2, ncols=1, figsize=(4, 6))
 TYPE = "score" 
 axs[0].plot(
     list(data[f"bayesopt_{TYPE}"][10:]),
-    label=f"BayesOpt ({np.average(data[f'bayesopt_{TYPE}'][10:]):.4f})",
+    label=f"BayesOpt+GP ({np.average(data[f'bayesopt_{TYPE}'][10:]):.4f})",
     color=COLORS[0],
 )
 axs[0].plot(
@@ -49,7 +49,7 @@ axs[0].plot(
 TYPE = "best_retrieved" 
 axs[1].plot(
     list(data[f"bayesopt_{TYPE}"][10:]),
-    label=f"BayesOpt ({np.average(data[f'bayesopt_{TYPE}'][10:]):.4f})",
+    label=f"BayesOpt+GP ({np.average(data[f'bayesopt_{TYPE}'][10:]):.4f})",
     color=COLORS[0],
 )
 axs[1].plot(
