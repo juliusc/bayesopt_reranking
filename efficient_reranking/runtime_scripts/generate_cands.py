@@ -37,7 +37,6 @@ def generate_candidates(data_path, num_candidates, max_batch_size, epsilon_cutof
 
 
     torch.manual_seed(0)
-
     data_lines = open(data_path).readlines()
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
