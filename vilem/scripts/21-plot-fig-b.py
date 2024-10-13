@@ -28,7 +28,7 @@ for data_i, (data, bs) in enumerate([(data_2, 2), (data_5, 5), (data_10, 10)][::
     #  ({np.average(data_y):.4f})
     plt.plot(
         data_x,
-        np.array(data_y_bs1)-np.array(data_y),
+        np.array(data_y)-np.array(data_y_bs1),
         label=f"BayesOpt+GP\nbatch size {bs}",
         color=COLORS[0],
         alpha=1-data_i/3,
