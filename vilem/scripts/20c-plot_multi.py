@@ -29,13 +29,13 @@ _, axs = plt.subplots(nrows=2, ncols=1, figsize=(4, 6))
 
 TYPE = "score" 
 axs[0].plot(
-    np.array(data_S_50[f"bayesopt_score"][10:]),
-    label=f"BayesOpt+GP\nwith Distilled-S ({np.average(data_S_50[f'bayesopt_score'][10:]):.4f})",
+    np.array(data_S_50[f"bayesopt_score"][10:])/20,
+    label=f"BayesOpt+GP\nwith Distilled-S ({np.average(np.array(data_S_50[f'bayesopt_score'][10:])/20):.4f})",
     color=COLORS[0],
 )
 axs[0].plot(
-    np.array(data_S_50[f"proxy_first_score"][10:]),
-    label=f"Distilled-S ({np.average(data_S_50[f'proxy_first_score'][10:]):.4f})",
+    np.array(data_S_50[f"proxy_first_score"][10:])/20,
+    label=f"Distilled-S ({np.average(np.array(data_S_50[f'proxy_first_score'][10:])/20):.4f})",
     color=COLORS[0],
     linestyle="--",
 )
@@ -46,13 +46,14 @@ axs[0].plot(
     linestyle="--",
 )
 axs[0].plot(
-    np.array(data_M_50[f"bayesopt_score"][10:]),
-    label=f"BayesOpt+GP\nwith Distilled-M ({np.average(data_M_50[f'bayesopt_score'][10:]):.4f})",
+    np.array(data_M_50[f"bayesopt_score"][10:])/20,
+    label=f"BayesOpt+GP\nwith Distilled-M ({np.average(np.array(
+        data_M_50[f'bayesopt_score'][10:])/20):.4f})",
     color=COLORS[2],
 )
 axs[0].plot(
-    np.array(data_M_50[f"proxy_first_score"][10:]),
-    label=f"Distilled-M ({np.average(data_M_50[f'proxy_first_score'][10:]):.4f})",
+    np.array(data_M_50[f"proxy_first_score"][10:])/20,
+    label=f"Distilled-M ({np.average(np.array(data_M_50[f'proxy_first_score'][10:])/20):.4f})",
     color=COLORS[2],
     linestyle="--",
 )
