@@ -3,6 +3,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import matplotlib as mpl
 
+import matplotlib.ticker as mtick
 
 COLORS = [
     "#b93f43", # red
@@ -15,7 +16,7 @@ COLORS = [
 # set default line width
 mpl.rcParams["lines.linewidth"] = 2
 
-data = h5py.File('computed/results/all_0.7_1.h5', 'r')
+data = h5py.File('computed/results-base/all_0.7_1.h5', 'r')
 
 _, axs = plt.subplots(nrows=2, ncols=1, figsize=(4, 6))
 
@@ -75,16 +76,19 @@ axs[1].plot(
 
 axs[0].set_ylabel("Selected candidate score")
 axs[1].set_ylabel("% Selected candidate is top")
+axs[1].yaxis.set_major_formatter(mtick.PercentFormatter(xmax=1))
 axs[0].set_xlabel("Number of CometKiwi runs")
 axs[1].set_xlabel("Number of CometKiwi runs")
+
+
 
 axs[0].set_ylim(0.79, None)
 
 for ax in axs.flatten():
     ax.spines[["top", "right"]].set_visible(False)
     ax.set_xticks(
-        np.arange(10, 250, 50)-10,
-        np.arange(10, 250, 50),
+        list(np.arange(10, 200, 50)-10)+[200],
+        list(np.arange(10, 200, 50))+[200],
     )
     ax.legend(
         edgecolor="white",

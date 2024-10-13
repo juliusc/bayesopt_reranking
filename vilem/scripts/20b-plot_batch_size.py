@@ -11,10 +11,10 @@ COLORS = [
     "#b4ab30", # yellow
 ]
 
-data_1 = h5py.File('computed/results/all_0.7_1.h5', 'r')
-data_2 = h5py.File('computed/results/all_0.7_2.h5', 'r')
-data_5 = h5py.File('computed/results/all_0.7_5.h5', 'r')
-data_10 = h5py.File('computed/results/all_0.7_10.h5', 'r')
+data_1 = h5py.File('computed/results-base/all_0.7_1.h5', 'r')
+data_2 = h5py.File('computed/results-base/all_0.7_2.h5', 'r')
+data_5 = h5py.File('computed/results-base/all_0.7_5.h5', 'r')
+data_10 = h5py.File('computed/results-base/all_0.7_10.h5', 'r')
 TYPE = "score" 
 
 plt.figure(figsize=(4, 3))
@@ -35,7 +35,7 @@ for data_i, (data, bs) in enumerate([(data_2, 2), (data_5, 5), (data_10, 10)][::
         linewidth=3,
     )
 
-plt.xlim(-10, 210)
+plt.xlim(-10, 200)
 plt.hlines(0, *plt.xlim(), color="black", linewidth=0.7)
 
 plt.gca().spines[["top", "right", "bottom"]].set_visible(False)
@@ -43,8 +43,8 @@ plt.ylabel("$\Delta$ in selected candidate score\nagainst batch size 1")
 plt.xlabel("Max number of CometKiwi runs")
 
 plt.xticks(
-    np.arange(10, 250, 50),
-    np.arange(10, 250, 50),
+    list(np.arange(10, 200, 50))+[200],
+    list(np.arange(10, 200, 50))+[200],
 )
 plt.legend(
     edgecolor="white",
