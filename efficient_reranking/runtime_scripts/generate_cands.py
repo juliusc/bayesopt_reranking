@@ -20,11 +20,9 @@ MAX_GENERATION_LENGTH = 256
 def process_result(output, tokenizer):
     """Process generation output to extract the data to save: text, token logprobs, and embeddings."""
     texts = tokenizer.batch_decode(output.sequences, skip_special_tokens=True)
-    logprobs = torch.zeros_like(output.sequences[:, 2:], dtype=output.scores[0].dtype)
     decoder_embeddings = []
     for t in range(2, output.sequences.shape[1]):
         scores = output.scores[t-1].log_softmax(dim=-1)
-        logprobs[:, t-2] = scores.gather(1, output.sequences[:, t:t+1]).squeeze()
         decoder_embeddings.append(output.decoder_hidden_states[t-1][-1].squeeze())
 
     decoder_embeddings = torch.stack(decoder_embeddings, dim=1)
@@ -74,7 +72,7 @@ def generate_candidates(data_path, num_candidates, max_batch_size, epsilon_cutof
                 batch_size = min(max_batch_size, num_candidates - num_samples_done)
                 gen_config = GenerationConfig(
                     max_length=MAX_GENERATION_LENGTH,
-                    num_return_sequences=num_candidates,
+                    num_return_sequences=batch_size,
                     epsilon_cutoff=epsilon_cutoff,
                     do_sample=True
                 )

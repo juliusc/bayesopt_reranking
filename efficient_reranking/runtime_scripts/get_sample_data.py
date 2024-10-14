@@ -39,4 +39,4 @@ def sample_jsonl_by_language_pair(input_file, output_file, num_samples=20):
 # Usage
 input_file = 'test_small.jsonl'  # Replace with your input JSONL file path
 output_file = 'runtime_sample2.jsonl'  # Replace with your output JSONL file path
-sample_jsonl_by_language_pair(input_file, output_file, num_samples=20)
+sample_jsonl_by_language_pair(input_file, output_file, num_samples=10)
