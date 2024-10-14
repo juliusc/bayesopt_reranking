@@ -11,7 +11,7 @@ def main(args):
     for split in "dev", "test_small":
         split_work_dir = Path(args.work_dir) / split
         with (h5py.File((split_work_dir / utils.CANDIDATES_FILENAME).with_suffix(".h5")) as cand_h5,
-              h5py.File((split_work_dir / (utils.SIMILARITIES_FILENAME_BASE + "_cosine")).with_suffix(".h5"), "w") as sim_h5):
+              h5py.File((split_work_dir / (utils.SIMILARITIES_FILENAME_BASE + "cosine")).with_suffix(".h5"), "w") as sim_h5):
             emb_h5ds = cand_h5[utils.CANDIDATES_EMBEDDINGS_H5DS_NAME]
             sim_h5ds = sim_h5.create_dataset(
                 utils.SIMILARITIES_H5DS_NAME,
