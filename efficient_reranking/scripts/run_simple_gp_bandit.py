@@ -50,7 +50,8 @@ def get_data_indices(data_dir, work_dir, split, lang_pair):
         for i, data_line in enumerate(data_file):
             data = json.loads(data_line)
             if ((lang_pair == "all" or data["langs"] == lang_pair) and
-                candidates_h5ds[i][0]):
+                candidates_h5ds[i][0] and
+                data["langs"] != "cs-uk"):
                 data_indices.append(i)
 
     return data_indices
@@ -84,7 +85,8 @@ def load_scores_and_similarities(
                 scores_h5ds = scores_h5[utils.COMET_SCORES_H5DS_NAME]
                 scores[:, :, metric_idx] = scores_h5ds[data_idxs]
 
-        logprobs = logprobs_h5[utils.SUM_LOGPROBS_H5DS_NAME][data_idxs]
+        sum_logprobs = logprobs_h5[utils.SUM_LOGPROBS_H5DS_NAME][data_idxs]
+        avg_logprobs = logprobs_h5[utils.AVG_LOGPROBS_H5DS_NAME][data_idxs]
         counts = counts_h5ds[data_idxs]
 
         # Break out the big score matrix into a list of scores per instance
@@ -96,7 +98,7 @@ def load_scores_and_similarities(
             instance_scores.append(scores[idx, :num_cands])
             sims.append(sim_h5ds[data_idx].reshape(max_cands, max_cands)[:num_cands, :num_cands])
 
-        return instance_scores, sims, counts, logprobs
+        return instance_scores, sims, counts, sum_logprobs, avg_logprobs
 
 
 def main(args):
@@ -105,44 +107,21 @@ def main(args):
 
     output_dir = work_dir / args.split / "gp_results"
     output_dir.mkdir(parents=True, exist_ok=True)
-    output_filename = output_dir / f"{args.lang_pair}_{args.bandwidth}_{args.batch_size}.json"
+    output_filename = output_dir / f"{args.lang_pair}_{args.bandwidth}_{args.batch_size}.h5"
 
-    all_scores, all_sims, all_counts, all_logprobs = load_scores_and_similarities(
+    all_scores, all_sims, all_counts, all_sum_logprobs, all_avg_logprobs = load_scores_and_similarities(
         args.data_dir, args.work_dir, args.split, args.model_class_name)
 
     INITIAL_SIZE = 10
     MAX_EVALS = 200
 
-    output_h5 = h5py.File(output_filename)
-    for method in ["random", "random_deduped", "logprob_first", "bayesopt"]:
-        output_h5.create_dataset(f"{method}_total", (MAX_EVALS,), float)
-        output_h5.create_dataset(f"{method}_best_retrieved", (MAX_EVALS,), int)
-        output_h5.create_dataset(f"{method}_scores", (MAX_EVALS, len(all_scores)), float)
+    log_data = {}
+    for method in ["random", "random_deduped", "sum_logprob_first", "avg_logprob_first", "hill_climbing", "bayesopt"]:
+        log_data[f"{method}_score"] = defaultdict(float)
+        log_data[f"{method}_best_retrieved"] = defaultdict(float)
+        log_data[f"{method}_scores"] = defaultdict(lambda: [0.0] * len(all_scores))
 
-    log_data = {
-        "num_instances": 0,
-        "baseline_min_total": 0,
-        "baseline_max_total": 0,
-        "baseline_random_total": defaultdict(int),
-        "baseline_random_deduped_total": defaultdict(int),
-        "baseline_hill_climbing_total": defaultdict(int),
-        "baseline_highest_logprob_total": defaultdict(int),
-        "bandit_total": defaultdict(int),
-        "baseline_random_best_retrieved": defaultdict(int),
-        "baseline_random_deduped_best_retrieved": defaultdict(int),
-        "baseline_hill_climbing_best_retrieved": defaultdict(int),
-        "baseline_highest_logprob_best_retrieved": defaultdict(int),
-        "bandit_best_retrieved": defaultdict(int),
-        "baseline_random_scores": defaultdict(list),
-        "baseline_random_deduped_scores": defaultdict(list),
-        "baseline_hill_climbing_scores": defaultdict(list),
-        "baseline_highest_logprob_scores": defaultdict(list),
-        "bandit_scores": defaultdict(list)
-    }
-
-    all_scores = all_scores[:10]
-
-    for scores, sims, counts, logprobs in tqdm(zip(all_scores, all_sims, all_counts, all_logprobs)):
+    for instance_idx, (scores, sims, counts, sum_logprobs, avg_logprobs) in enumerate(tqdm(zip(all_scores, all_sims, all_counts, all_sum_logprobs, all_avg_logprobs))):
         scores = scores[:, -1]
         # For sampling without replacement for the baseline
         candidate_idxs = []
@@ -152,11 +131,8 @@ def main(args):
 
         random_deduped_idxs = list(dict.fromkeys(candidate_idxs))
 
-        logprob_sorted_idxs = (-logprobs[:scores.size]).argsort()
-
-        log_data["num_instances"] += 1
-        log_data["baseline_min_total"] += scores.min()
-        log_data["baseline_max_total"] += scores.max()
+        sum_logprob_sorted_idxs = (-sum_logprobs[:scores.size]).argsort()
+        avg_logprob_sorted_idxs = (-avg_logprobs[:scores.size]).argsort()
 
         best_idx = scores.argmax()
 
@@ -164,8 +140,8 @@ def main(args):
         # baseline_total += scores[highest_logprob_idxs].max()
 
         all_idxs = np.arange(scores.shape[0])
-        known_idxs = list(np.random.choice(scores.shape[0], min(INITIAL_SIZE, all_idxs.shape[0]), replace=False))
-        # known_idxs = candidate_idxs[:INITIAL_SIZE]
+        # known_idxs = list(np.random.choice(scores.shape[0], min(INITIAL_SIZE, all_idxs.shape[0]), replace=False))
+        known_idxs = list(random_deduped_idxs[:INITIAL_SIZE])
         unknown_idxs = [x for x in all_idxs if x not in known_idxs]
 
         # For hill climbing baseline
@@ -175,23 +151,26 @@ def main(args):
         rbf_cov = np.exp(-(1 - sims.reshape(-1)) / (2 * args.bandwidth ** 2)).reshape(all_idxs.size, all_idxs.size)
 
         while len(known_idxs) < min(MAX_EVALS, all_idxs.shape[0]):
-            log_data["baseline_random_total"][len(known_idxs)] += scores[candidate_idxs[:len(known_idxs)]].max()
-            log_data["baseline_random_deduped_total"][len(known_idxs)] += scores[random_deduped_idxs[:len(known_idxs)]].max()
-            log_data["baseline_hill_climbing_total"][len(known_idxs)] += scores[hc_known_idxs].max()
-            log_data["baseline_highest_logprob_total"][len(known_idxs)] += scores[logprob_sorted_idxs[:len(known_idxs)]].max()
-            log_data["bandit_total"][len(known_idxs)] += scores[known_idxs].max()
+            log_data["random_score"][len(known_idxs)] += scores[candidate_idxs[:len(known_idxs)]].max()
+            log_data["random_deduped_score"][len(known_idxs)] += scores[random_deduped_idxs[:len(known_idxs)]].max()
+            log_data["hill_climbing_score"][len(known_idxs)] += scores[hc_known_idxs].max()
+            log_data["sum_logprob_first_score"][len(known_idxs)] += scores[sum_logprob_sorted_idxs[:len(known_idxs)]].max()
+            log_data["avg_logprob_first_score"][len(known_idxs)] += scores[avg_logprob_sorted_idxs[:len(known_idxs)]].max()
+            log_data["bayesopt_score"][len(known_idxs)] += scores[known_idxs].max()
 
-            log_data["baseline_random_best_retrieved"][len(known_idxs)] += int(candidate_idxs[scores[candidate_idxs[:len(known_idxs)]].argmax()] == best_idx)
-            log_data["baseline_random_deduped_best_retrieved"][len(known_idxs)] += int(random_deduped_idxs[scores[random_deduped_idxs[:len(known_idxs)]].argmax()] == best_idx)
-            log_data["baseline_hill_climbing_best_retrieved"][len(known_idxs)] += int(hc_known_idxs[scores[hc_known_idxs[:len(hc_known_idxs)]].argmax()] == best_idx)
-            log_data["baseline_highest_logprob_best_retrieved"][len(known_idxs)] += int(logprob_sorted_idxs[scores[logprob_sorted_idxs[:len(known_idxs)]].argmax()] == best_idx)
-            log_data["bandit_best_retrieved"][len(known_idxs)] += int(known_idxs[scores[known_idxs].argmax()] == best_idx)
+            log_data["random_best_retrieved"][len(known_idxs)] += int(candidate_idxs[scores[candidate_idxs[:len(known_idxs)]].argmax()] == best_idx)
+            log_data["random_deduped_best_retrieved"][len(known_idxs)] += int(random_deduped_idxs[scores[random_deduped_idxs[:len(known_idxs)]].argmax()] == best_idx)
+            log_data["hill_climbing_best_retrieved"][len(known_idxs)] += int(hc_known_idxs[scores[hc_known_idxs[:len(hc_known_idxs)]].argmax()] == best_idx)
+            log_data["sum_logprob_first_best_retrieved"][len(known_idxs)] += int(sum_logprob_sorted_idxs[scores[sum_logprob_sorted_idxs[:len(known_idxs)]].argmax()] == best_idx)
+            log_data["avg_logprob_first_best_retrieved"][len(known_idxs)] += int(avg_logprob_sorted_idxs[scores[avg_logprob_sorted_idxs[:len(known_idxs)]].argmax()] == best_idx)
+            log_data["bayesopt_best_retrieved"][len(known_idxs)] += int(known_idxs[scores[known_idxs].argmax()] == best_idx)
 
-            log_data["baseline_random_scores"][len(known_idxs)].append(scores[candidate_idxs[:len(known_idxs)]].max())
-            log_data["baseline_random_deduped_scores"][len(known_idxs)].append(scores[random_deduped_idxs[:len(known_idxs)]].max())
-            log_data["baseline_hill_climbing_scores"][len(known_idxs)].append(scores[hc_known_idxs].max())
-            log_data["baseline_highest_logprob_scores"][len(known_idxs)].append(scores[logprob_sorted_idxs[:len(known_idxs)]].max())
-            log_data["bandit_scores"][len(known_idxs)].append(scores[known_idxs].max())
+            log_data["random_scores"][len(known_idxs)][instance_idx] = scores[candidate_idxs[:len(known_idxs)]].max()
+            log_data["random_deduped_scores"][len(known_idxs)][instance_idx] = scores[random_deduped_idxs[:len(known_idxs)]].max()
+            log_data["hill_climbing_scores"][len(known_idxs)][instance_idx] = scores[hc_known_idxs].max()
+            log_data["sum_logprob_first_scores"][len(known_idxs)][instance_idx] = scores[sum_logprob_sorted_idxs[:len(known_idxs)]].max()
+            log_data["avg_logprob_first_scores"][len(known_idxs)][instance_idx] = scores[avg_logprob_sorted_idxs[:len(known_idxs)]].max()
+            log_data["bayesopt_scores"][len(known_idxs)][instance_idx] = scores[known_idxs].max()
 
             known_scores = scores[known_idxs]
             known_scores -= known_scores.mean()
@@ -245,28 +224,44 @@ def main(args):
 
         for total_cands in range(len(known_idxs), MAX_EVALS + 1):
             if total_cands % args.batch_size == 0:
-                log_data["baseline_random_total"][total_cands] += scores[candidate_idxs[:total_cands]].max()
-                log_data["baseline_random_deduped_total"][total_cands] += scores[random_deduped_idxs[:total_cands]].max()
-                log_data["baseline_hill_climbing_total"][total_cands] += scores[hc_known_idxs].max()
-                log_data["baseline_highest_logprob_total"][total_cands] += scores[logprob_sorted_idxs[:total_cands]].max()
-                log_data["bandit_total"][total_cands] += scores[known_idxs].max()
+                log_data["random_score"][total_cands] += scores[candidate_idxs[:total_cands]].max()
+                log_data["random_deduped_score"][total_cands] += scores[random_deduped_idxs[:total_cands]].max()
+                log_data["hill_climbing_score"][total_cands] += scores[hc_known_idxs].max()
+                log_data["sum_logprob_first_score"][total_cands] += scores[sum_logprob_sorted_idxs[:total_cands]].max()
+                log_data["avg_logprob_first_score"][total_cands] += scores[avg_logprob_sorted_idxs[:total_cands]].max()
+                log_data["bayesopt_score"][total_cands] += scores[known_idxs].max()
 
-                log_data["baseline_random_best_retrieved"][total_cands] += int(candidate_idxs[scores[candidate_idxs[:total_cands]].argmax()] == best_idx)
-                log_data["baseline_random_deduped_best_retrieved"][total_cands] += int(random_deduped_idxs[scores[random_deduped_idxs[:total_cands]].argmax()] == best_idx)
-                log_data["baseline_hill_climbing_best_retrieved"][total_cands] += int(hc_known_idxs[scores[hc_known_idxs].argmax()] == best_idx)
-                log_data["baseline_highest_logprob_best_retrieved"][total_cands] += int(logprob_sorted_idxs[scores[logprob_sorted_idxs[:total_cands]].argmax()] == best_idx)
-                log_data["bandit_best_retrieved"][total_cands] += int(known_idxs[scores[known_idxs].argmax()] == best_idx)
+                log_data["random_best_retrieved"][total_cands] += int(candidate_idxs[scores[candidate_idxs[:total_cands]].argmax()] == best_idx)
+                log_data["random_deduped_best_retrieved"][total_cands] += int(random_deduped_idxs[scores[random_deduped_idxs[:total_cands]].argmax()] == best_idx)
+                log_data["hill_climbing_best_retrieved"][total_cands] += int(hc_known_idxs[scores[hc_known_idxs].argmax()] == best_idx)
+                log_data["sum_logprob_first_best_retrieved"][total_cands] += int(sum_logprob_sorted_idxs[scores[sum_logprob_sorted_idxs[:total_cands]].argmax()] == best_idx)
+                log_data["avg_logprob_first_best_retrieved"][total_cands] += int(avg_logprob_sorted_idxs[scores[avg_logprob_sorted_idxs[:total_cands]].argmax()] == best_idx)
+                log_data["bayesopt_best_retrieved"][total_cands] += int(known_idxs[scores[known_idxs].argmax()] == best_idx)
 
-                log_data["baseline_random_scores"][total_cands].append(scores[candidate_idxs[:len(known_idxs)]].max())
-                log_data["baseline_random_deduped_scores"][total_cands].append(scores[random_deduped_idxs[:len(known_idxs)]].max())
-                log_data["baseline_hill_climbing_scores"][total_cands].append(scores[hc_known_idxs].max())
-                log_data["baseline_highest_logprob_scores"][total_cands].append(scores[logprob_sorted_idxs[:len(known_idxs)]].max())
-                log_data["bandit_scores"][total_cands].append(scores[known_idxs].max())
+                log_data["random_scores"][total_cands][instance_idx] = scores[candidate_idxs[:len(known_idxs)]].max()
+                log_data["random_deduped_scores"][total_cands][instance_idx] = scores[random_deduped_idxs[:len(known_idxs)]].max()
+                log_data["hill_climbing_scores"][total_cands][instance_idx] = scores[hc_known_idxs].max()
+                log_data["sum_logprob_first_scores"][total_cands][instance_idx] = scores[sum_logprob_sorted_idxs[:len(known_idxs)]].max()
+                log_data["avg_logprob_first_scores"][total_cands][instance_idx] = scores[avg_logprob_sorted_idxs[:len(known_idxs)]].max()
+                log_data["bayesopt_scores"][total_cands][instance_idx] = scores[known_idxs].max()
 
-    with open(output_filename, "w") as f:
-        f.write(json.dumps(log_data))
+    for n in range(MAX_EVALS + 1):
+        for method in ["random", "random_deduped", "sum_logprob_first", "avg_logprob_first", "hill_climbing", "bayesopt"]:
+            for stat in ["score", "best_retrieved"]:
+                log_data[f"{method}_{stat}"][n] /= len(all_scores)
 
-    import pdb; pdb.set_trace()
+    output_h5 = h5py.File(output_filename, 'w')
+
+    for method in ["random", "random_deduped", "sum_logprob_first", "avg_logprob_first", "hill_climbing", "bayesopt"]:
+        for stat in ["score", "best_retrieved"]:
+            h5ds = output_h5.create_dataset(f"{method}_{stat}", (MAX_EVALS + 1,), float)
+            h5ds[:] = np.array([log_data[f"{method}_{stat}"][n] for n in range(MAX_EVALS+1)])
+        h5ds = output_h5.create_dataset(f"{method}_scores", (MAX_EVALS + 1, len(all_scores)), float)
+        for n in range(MAX_EVALS+1):
+            h5ds[n] = np.array(log_data[f"{method}_scores"][n])
+
+        # for n in range(MAX_EVALS):
+
 
     # print(log_data["baseline_max_total"] / len(all_scores))
     # for k in log_data["bandit_total"]:
