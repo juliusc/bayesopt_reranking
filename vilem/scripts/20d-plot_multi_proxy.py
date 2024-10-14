@@ -13,7 +13,7 @@ COLORS = [
     "#548f5c", # green
     "#7f99cc", # light blue
     "#5c3f81", # purple
-    "#b4ab30", # yellow
+    "#96792b", # yellow
 ]
 
 # set default line width
@@ -28,6 +28,8 @@ data_bayesopt = h5py.File('computed/results-base/all_0.7_1.h5', 'r')["bayesopt_s
 
 plt.figure(figsize=(4, 4))
 
+COLOR = COLORS[3] if args.proxy == "S" else COLORS[4]
+
 TYPE = "score" 
 # TODO: modify cost on x-axis
 plt.plot(
@@ -35,54 +37,76 @@ plt.plot(
     label=f"BayesOpt+GP ({np.average(data_bayesopt[10:]):.4f})",
     color=COLORS[0],
 )
+# +200*0.76/5.89
 plt.plot(
-    np.array(range(len(data_200[f"bayesopt_score"][10:])))+200*0.76/5.89,
-    np.array(data_200[f"bayesopt_score"][10:])/20,
-    label=f"BayesOpt+GP with 200 Distilled-{args.proxy} ({np.average(np.array(data_200[f'bayesopt_score'][10:])/20):.4f})",
-    color=COLORS[0],
-    alpha=0.75,
+    np.array(range(len(data_200[f"bayesopt_score"][10:]))),
+    np.array(data_200[f"bayesopt_score"][10:]),
+    label=f"BayesOpt+GP with 200 Distilled-{args.proxy} ({np.average(np.array(data_200[f'bayesopt_score'][10:])):.4f})",
+    color=COLOR,
+    alpha=1,
 )
+# +100*0.76/5.89
+# plt.plot(
+#     np.array(range(len(data_100[f"bayesopt_score"][10:]))),
+#     np.array(data_100[f"bayesopt_score"][10:]),
+#     label=f"BayesOpt+GP with 100 Distilled-{args.proxy} ({np.average(np.array(data_100[f'bayesopt_score'][10:])):.4f})",
+#     color=COLORS[5],
+#     alpha=0.66,
+# )
+# +50*0.76/5.89
 plt.plot(
-    np.array(range(len(data_100[f"bayesopt_score"][10:])))+100*0.76/5.89,
-    np.array(data_100[f"bayesopt_score"][10:])/20,
-    label=f"BayesOpt+GP with 100 Distilled-{args.proxy} ({np.average(np.array(data_100[f'bayesopt_score'][10:])/20):.4f})",
-    color=COLORS[0],
+    np.array(range(len(data_50[f"bayesopt_score"][10:]))),
+    np.array(data_50[f"bayesopt_score"][10:]),
+    label=f"BayesOpt+GP with 50 Distilled-{args.proxy} ({np.average(np.array(data_50[f'bayesopt_score'][10:])):.4f})",
+    color=COLOR,
     alpha=0.5,
 )
+# +50*0.76/5.89
 plt.plot(
-    np.array(range(len(data_50[f"bayesopt_score"][10:])))+50*0.76/5.89,
-    np.array(data_50[f"bayesopt_score"][10:])/20,
-    label=f"BayesOpt+GP with 50 Distilled-{args.proxy} ({np.average(np.array(data_50[f'bayesopt_score'][10:])/20):.4f})",
-    color=COLORS[0],
-    alpha=0.25,
+    np.array(range(len(data_200[f"proxy_first_score"][10:]))),
+    np.array(data_200[f"proxy_first_score"][10:]),
+    label=f"ProxyFirst 200 Distilled-{args.proxy} ({np.average(np.array(data_200[f'proxy_first_score'][10:])):.4f})",
+    color=COLOR,
+    linestyle="--",
 )
 plt.plot(
-    np.array(range(len(data_100[f"proxy_first_score"][10:])))+50*0.76/5.89,
-    np.array(data_100[f"proxy_first_score"][10:])/20,
-    label=f"ProxyFirst 100 Distilled-{args.proxy} ({np.average(np.array(data_100[f'proxy_first_score'][10:])/20):.4f})",
-    color=COLORS[4],
+    np.array(range(len(data_50[f"proxy_first_score"][10:50]))),
+    np.array(data_50[f"proxy_first_score"][10:50]),
+    label=f"ProxyFirst 50 Distilled-{args.proxy} ({np.average(np.array(data_50[f'proxy_first_score'][10:])):.4f})",
+    color=COLOR,
+    linestyle="--",
+    alpha=0.5,
 )
 
 ax = plt.gca()
 ax.set_ylabel("Selected candidate score")
 ax.set_xlabel("Number of CometKiwi runs")
-ax.set_ylim(0.79, None)
+ax.set_ylim(0.804, 0.8221)
+ax.set_xlim(None, 60)
 
 ax.spines[["top", "right"]].set_visible(False)
+plt.text(
+    0.95, 0.0,
+    "(zoomed-in axes)",
+    horizontalalignment='right',
+    verticalalignment='bottom',
+    transform=ax.transAxes,
+    fontsize=10,
+    fontweight='bold',
+)
 ax.set_xticks(
-    list(np.arange(10, 200, 50)-10)+[200],
-    list(np.arange(10, 200, 50))+[200],
+    list(np.arange(10, 80, 20)-10),
+    list(np.arange(10, 80, 20)),
 )
 ax.legend(
     edgecolor="white",
     fancybox=False,
-    # handlelength=1,
     labelspacing=0.3,
     loc='upper center',
-    bbox_to_anchor=(0.45, 1.5),
+    bbox_to_anchor=(0.45, 1.42),
     framealpha=0,
 )
-plt.subplots_adjust(top=0.6)
+plt.subplots_adjust(top=0.63)
 plt.tight_layout(rect=(0, 0, 1, 1))
 plt.savefig(f"figures/results_multi_{args.proxy}.pdf")
 plt.show()

@@ -1,14 +1,17 @@
 import h5py
 import matplotlib.pyplot as plt
 import numpy as np
+import matplotlib as mpl
 
+# set default line width
+mpl.rcParams["lines.linewidth"] = 2
 
 COLORS = [
     "#b93f43", # red
     "#548f5c", # green
     "#7f99cc", # light blue
     "#5c3f81", # purple
-    "#b4ab30", # yellow
+    "#96792b", # yellow
 ]
 
 data_1 = h5py.File('computed/results-base/all_0.7_1.h5', 'r')
@@ -50,7 +53,7 @@ plt.legend(
     edgecolor="white",
     fancybox=False,
     framealpha=0,
-    handlelength=1,
+    handletextpad=0.3,
     labelspacing=0.9,
 )
 

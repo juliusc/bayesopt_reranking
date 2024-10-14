@@ -10,7 +10,7 @@ COLORS = [
     "#548f5c", # green
     "#7f99cc", # light blue
     "#5c3f81", # purple
-    "#b4ab30", # yellow
+    "#96792b", # yellow
 ]
 
 # set default line width
@@ -39,12 +39,13 @@ axs[0].plot(
 axs[0].plot(
     list(data[f"random_deduped_{TYPE}"][10:]),
     label=f"UniqRandom ({np.average(data[f'random_deduped_{TYPE}'][10:]):.4f})",
-    color=COLORS[3],
+    color="black",
 )
 axs[0].plot(
     list(data[f"sum_logprob_first_{TYPE}"][10:]),
     label=f"LogprobSum ({np.average(data[f'sum_logprob_first_{TYPE}'][10:]):.4f})",
-    color=COLORS[4],
+    color=COLORS[1],
+    linestyle="--",
 )
 
 TYPE = "best_retrieved" 
@@ -66,12 +67,13 @@ axs[1].plot(
 axs[1].plot(
     list(data[f"random_deduped_{TYPE}"][10:]),
     label=f"UniqRandom ({np.average(data[f'random_deduped_{TYPE}'][10:]):.4f})",
-    color=COLORS[3],
+    color="black",
 )
 axs[1].plot(
     list(data[f"sum_logprob_first_{TYPE}"][10:]),
     label=f"LogprobSum ({np.average(data[f'sum_logprob_first_{TYPE}'][10:]):.4f})",
-    color=COLORS[4],
+    color=COLORS[1],
+    linestyle="--",
 )
 
 axs[0].set_ylabel("Selected candidate score")
@@ -93,8 +95,8 @@ for ax in axs.flatten():
     ax.legend(
         edgecolor="white",
         fancybox=False,
-        handlelength=1,
         labelspacing=0.3,
+        handletextpad=0.1,
         loc="lower right",
         bbox_to_anchor=(1.05, 0),
         framealpha=0,

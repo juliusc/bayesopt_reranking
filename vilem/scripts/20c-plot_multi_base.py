@@ -9,7 +9,7 @@ COLORS = [
     "#548f5c", # green
     "#7f99cc", # light blue
     "#5c3f81", # purple
-    "#b4ab30", # yellow
+    "#96792b", # yellow
 ]
 
 # set default line width
@@ -22,6 +22,7 @@ data_M_50 = h5py.File('computed/results-multi/all_0.7_1_M_50.h5', 'r')
 data_M_100 = h5py.File('computed/results-multi/all_0.7_1_M_100.h5', 'r')
 data_M_200 = h5py.File('computed/results-multi/all_0.7_1_M_200.h5', 'r')
 
+data_bayeslogprob = h5py.File('computed/results-multi/all_0.7_1_avg_logprob_200.h5', 'r')["bayesopt_score"]
 data_logprob = h5py.File('computed/results-base/all_0.7_1.h5', 'r')["avg_logprob_first_score"]
 data_bayesopt = h5py.File('computed/results-base/all_0.7_1.h5', 'r')["bayesopt_score"]
 data_random = h5py.File('computed/results-base/all_0.7_1.h5', 'r')["random_deduped_score"]
@@ -32,8 +33,8 @@ plt.figure(figsize=(4, 4))
 TYPE = "score" 
 # TODO: modify cost on x-axis
 plt.plot(
-    np.array(data_logprob[10:]),
-    label=f"LogprobAvg ({np.average(data_logprob[10:]):.4f})",
+    np.array(data_bayeslogprob[10:]),
+    label=f"BayesOpt+GP with LogprobAvg ({np.average(data_bayeslogprob[10:]):.4f})",
     color=COLORS[1],
 )
 plt.plot(
@@ -41,47 +42,57 @@ plt.plot(
     label=f"BayesOpt+GP ({np.average(data_bayesopt[10:]):.4f})",
     color=COLORS[0],
 )
+# +200*0.76/5.89
 plt.plot(
-    np.array(range(len(data_S_200[f"bayesopt_score"][10:])))+200*0.76/5.89,
-    np.array(data_S_200[f"bayesopt_score"][10:])/20,
-    label=f"BayesOpt+GP with 200 Distilled-S ({np.average(np.array(data_S_200[f'bayesopt_score'][10:])/20):.4f})",
-    color=COLORS[0],
-    alpha=0.8,
-)
-plt.plot(
-    np.array(range(len(data_S_200[f"bayesopt_score"][10:])))+200*1.87/5.89,
-    np.array(data_M_200[f"bayesopt_score"][10:])/20,
-    label=f"BayesOpt+GP with 200 Distilled-M ({np.average(np.array(data_M_200[f'bayesopt_score'][10:])/20):.4f})",
-    color=COLORS[0],
-    alpha=0.5,
-    linestyle="--",
-)
-plt.plot(
-    list(data_random[10:]),
-    label=f"UniqRandom ({np.average(data_random[10:]):.4f})",
+    np.array(range(len(data_S_200[f"bayesopt_score"][10:]))),
+    np.array(data_S_200[f"bayesopt_score"][10:]),
+    label=f"BayesOpt+GP with 200 Distilled-S ({np.average(np.array(data_S_200[f'bayesopt_score'][10:])):.4f})",
     color=COLORS[3],
+    # linestyle="--",
 )
+# +200*1.87/5.89
+plt.plot(
+    np.array(range(len(data_S_200[f"bayesopt_score"][10:]))),
+    np.array(data_M_200[f"bayesopt_score"][10:]),
+    label=f"BayesOpt+GP with 200 Distilled-M ({np.average(np.array(data_M_200[f'bayesopt_score'][10:])):.4f})",
+    color=COLORS[4],
+)
+# plt.plot(
+#     list(data_random[10:]),
+#     label=f"UniqRandom ({np.average(data_random[10:]):.4f})",
+#     color=COLORS[3],
+# )
 
 ax = plt.gca()
 ax.set_ylabel("Selected candidate score")
 ax.set_xlabel("Number of CometKiwi runs")
-ax.set_ylim(0.79, None)
+ax.set_ylim(0.804, 0.8221)
+ax.set_xlim(None, 60)
 
 ax.spines[["top", "right"]].set_visible(False)
+plt.text(
+    0.95, 0.0,
+    "(zoomed-in axes)",
+    horizontalalignment='right',
+    verticalalignment='bottom',
+    transform=ax.transAxes,
+    fontsize=10,
+    fontweight='bold',
+)
 ax.set_xticks(
-    list(np.arange(10, 200, 50)-10)+[200],
-    list(np.arange(10, 200, 50))+[200],
+    list(np.arange(10, 80, 20)-10),
+    list(np.arange(10, 80, 20)),
 )
 ax.legend(
     edgecolor="white",
     fancybox=False,
     labelspacing=0.3,
     loc='upper center',
-    bbox_to_anchor=(0.45, 1.5),
+    bbox_to_anchor=(0.45, 1.42),
     framealpha=0,
 )
 
-plt.subplots_adjust(top=0.6)
+plt.subplots_adjust(top=0.63)
 plt.tight_layout(rect=(0, 0, 1, 1))
 plt.savefig("figures/results_multi.pdf")
 plt.show()
