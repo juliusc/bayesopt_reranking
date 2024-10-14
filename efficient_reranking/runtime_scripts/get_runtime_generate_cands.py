@@ -6,7 +6,8 @@ import comet
 import torch
 import torch.nn.functional as F
 from tqdm import tqdm
-from generate_cands_no_hidden import generate_candidates as generate_candidates_no_hiddens
+from generate_cands import generate_candidates
+from generate_cands_no_hidden import generate_candidates as generate_candidates_no_hidden
 import os
 import logging
 import time
@@ -28,7 +29,7 @@ def set_logging():
     logger = logging.getLogger()  # Use root logger
     logger.setLevel(logging.INFO)
 
-    file_handler = logging.FileHandler('log_runtime_baseline.log', mode='a')
+    file_handler = logging.FileHandler('log_runtime_generate_cands.log', mode='a')
     file_handler.setLevel(logging.INFO)
     console_handler = logging.StreamHandler()
     console_handler.setLevel(logging.INFO)
@@ -46,36 +47,12 @@ def main(args):
 
     # Start of candidate generation
     candidate_generation_start = time.time()
-    all_sources, all_texts, all_counts = generate_candidates_no_hiddens(args.data_path, args.num_candidates, args.max_batch_size, args.epsilon)
+    all_sources, all_texts, embeddings, all_counts = generate_candidates(args.data_path, args.num_candidates, args.max_batch_size, args.epsilon)
+    #all_sources, all_texts, all_counts = generate_candidates_no_hidden(args.data_path, args.num_candidates, args.max_batch_size, args.epsilon)
     candidate_generation_time = time.time() - candidate_generation_start
-
-    # Loading Comet models
-    comet_loading_start = time.time()
-    if args.comet_repo:
-        model_path = comet.download_model(args.comet_repo)
-        model = comet.load_from_checkpoint(model_path).eval()
-    elif args.comet_path:
-        model = comet.load_from_checkpoint(args.comet_path)
-    else:
-        raise ValueError("Must provide --comet_repo or --comet_path.")
-    comet_loading_time = time.time() - comet_loading_start
-
-    comet_kiwi_all_start = time.time()
-    inputs = []
-    for src, all_text, count in zip(all_sources, all_texts, all_counts):
-        num_cands = (count > 0).sum()
-        text = all_text[:num_cands]
-
-        inputs += [{"src": src, "mt": cand} for cand in text]
-
-    scores = model.predict(samples=inputs, batch_size=200, gpus=GPUS, num_workers=NUM_WORKERS).scores
-
-    kiwi_scoring_time = time.time() - comet_kiwi_all_start
 
     logger.info("=== SUMMARY OF TIMES ===")
     logger.info(f"Total candidate generation time: {candidate_generation_time:.2f} seconds")
-    logger.info(f"Total COMET loading time: {comet_loading_time:.2f} seconds")
-    logger.info(f"COMET scoring for all candidates completed in {kiwi_scoring_time:.2f} seconds.")
     logger.info(f"Entire process completed in {time.time() - global_start_time:.2f} seconds.")
 
 

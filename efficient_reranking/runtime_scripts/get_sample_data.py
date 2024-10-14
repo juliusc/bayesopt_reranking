@@ -11,12 +11,15 @@ def sample_jsonl_by_language_pair(input_file, output_file, num_samples=20):
         for line in infile:
             instance = json.loads(line.strip())
             langs = instance.get("langs")
+            if langs == "cs-uk":
+                continue
             if langs not in language_pairs:
                 language_pairs[langs] = []
             language_pairs[langs].append(instance)
 
     # Print the language pairs found
     print("Language pairs found in the dataset:")
+
     for langs in language_pairs.keys():
         print(f"- {langs}")
 
@@ -39,4 +42,4 @@ def sample_jsonl_by_language_pair(input_file, output_file, num_samples=20):
 # Usage
 input_file = 'test_small.jsonl'  # Replace with your input JSONL file path
 output_file = 'runtime_sample2.jsonl'  # Replace with your output JSONL file path
-sample_jsonl_by_language_pair(input_file, output_file, num_samples=10)
+sample_jsonl_by_language_pair(input_file, output_file, num_samples=50)

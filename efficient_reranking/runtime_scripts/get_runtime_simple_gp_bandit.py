@@ -103,7 +103,7 @@ def main(args):
     total_loop_time = 0
     total_posterior_calc_time = 0
 
-    iter_times = {i: 0 for i in range(10, MAX_EVALS + 1, 10)}
+    iter_times = {i: 0 for i in range(0, 20)}
 
     logger.info("Starting bandit process loop.")
     iteration_count = 0  # Track total iterations across the entire process
@@ -144,32 +144,34 @@ def main(args):
             known_known_cov = rbf_cov[known_idxs][:, known_idxs]
 
             posterior_start_time = time.time()
-            try:
-                inverse_known_known_plus_prior = np.linalg.inv(known_known_cov)
-                term_1 = np.matmul(inverse_known_known_plus_prior, known_unknown_cov)
-                term_2 = np.matmul(known_unknown_cov.T, term_1)
-                posterior_cov = unknown_unknown_cov - term_2
-                mean_term_1 = np.matmul(inverse_known_known_plus_prior, known_scores)
-                posterior_mean = np.matmul(known_unknown_cov.T, mean_term_1)
-                posterior_var = posterior_cov.diagonal()
-                best_score = known_scores.max()
-                cdf = norm.cdf(best_score, loc=posterior_mean, scale=posterior_var ** 0.5)
-                best_unknown_idx_idx = (1 - cdf).argmax()
-                known_idxs.append(unknown_idxs[best_unknown_idx_idx])
 
-                comet_calls["calls"][idx].append(int(unknown_idxs[best_unknown_idx_idx]))
-                del unknown_idxs[best_unknown_idx_idx]
+            inverse_known_known_plus_prior = np.linalg.inv(known_known_cov)
+            term_1 = np.matmul(inverse_known_known_plus_prior, known_unknown_cov)
+            term_2 = np.matmul(known_unknown_cov.T, term_1)
+            posterior_cov = unknown_unknown_cov - term_2
+            mean_term_1 = np.matmul(inverse_known_known_plus_prior, known_scores)
+            posterior_mean = np.matmul(known_unknown_cov.T, mean_term_1)
+            posterior_var = posterior_cov.diagonal()
+            best_score = known_scores.max()
+          
+            z = (best_score - posterior_mean) / (posterior_var ** 0.5)
+            ei = (
+                posterior_var ** 0.5 *
+                (z * norm.cdf(z) + norm.pdf(z))
+            )
+            best_idxs = np.array(unknown_idxs)[np.argpartition(ei, min(args.batch_size, len(unknown_idxs)-1))[:args.batch_size]]
 
-                posterior_calc_time = time.time() - posterior_start_time
-                total_posterior_calc_time += posterior_calc_time
-            except Exception as e:
-                logger.error("Error during posterior calculation.", exc_info=True)
-                break
+            known_idxs = known_idxs + list(best_idxs)
+            unknown_idxs = [x for x in all_idxs if x not in known_idxs]
 
-            # Log cumulative time every 10 iterations
-            if iteration_count % 10 == 0:
-                iter_time = time.time() - loop_start_time  # Time spent in this group of 10 iterations
-                iter_times[iteration_count] += iter_time  # Add to the corresponding entry in the dictionary
+            comet_calls["calls"][idx].append([int(x) for x in list(best_idxs)])
+
+            posterior_calc_time = time.time() - posterior_start_time
+            total_posterior_calc_time += posterior_calc_time
+
+
+            iter_time = time.time() - loop_start_time  # Time spent in this group of 10 iterations
+            iter_times[iteration_count] += iter_time  # Add to the corresponding entry in the dictionary
 
 
         
@@ -183,15 +185,15 @@ def main(args):
     logger.info(f"Total time spent on posterior calculations: {total_posterior_calc_time:.2f} seconds.")
     # Log cumulative times for each group of iterations (10, 20, 30, etc.)
     for key, value in iter_times.items():
-        logger.info(f"Time taken for {key} iterations: {value:.4f} seconds.")
+        logger.info(f"Time taken for {key*10} candidates: {value:.4f} seconds.")
 
-    with open("comet_calls.json", "w") as file:
+    with open("comet_calls_batch10.json", "w") as file:
         json.dump(comet_calls, file, indent=4)
 
-    logger.info(f"Baseline max total: {baseline_max_total / len(all_scores)}")
-    for k in bandit_total:
-        if k % 10 == 0:
-            logger.info(f"{k}: {bandit_total[k] / len(all_scores)}")
+    # logger.info(f"Baseline max total: {baseline_max_total / len(all_scores)}")
+    # for k in bandit_total:
+    #     if k % 10 == 0:
+    #         logger.info(f"{k}: {bandit_total[k] / len(all_scores)}")
 
 
 if __name__ == "__main__":
@@ -214,6 +216,9 @@ if __name__ == "__main__":
         "split", help="Data split.")
 
     parser.add_argument(
+        "batch_size", type=int, help="Bayesopt update batch size.")
+
+    parser.add_argument(
         "bandwidth", type=float, help="RBF bandwidth parameter.")
 
     parser.add_argument(
@@ -224,3 +229,5 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
     main(args)
+
+# python efficient_reranking/runtime_scripts/get_runtime_simple_gp_bandit.py blub efficient_reranking/runtime_scripts "wmt22-cometkiwi-da" all test 10 0.25

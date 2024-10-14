@@ -231,4 +231,4 @@ if __name__ == "__main__":
     args = parser.parse_args()
     main(args)
 
-# python efficient_reranking/runtime_scripts/h5d_generate_candidates.py test efficient_reranking/runtime_scripts --max_batch_size 200
+# python efficient_reranking/runtime_scripts/h5d_generate_candidates.py test efficient_reranking/runtime_scripts --max_batch_size 50
