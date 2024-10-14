@@ -31,12 +31,7 @@ plt.figure(figsize=(4, 4))
 COLOR = COLORS[3] if args.proxy == "S" else COLORS[4]
 
 TYPE = "score" 
-# TODO: modify cost on x-axis
-plt.plot(
-    np.array(data_bayesopt[10:]),
-    label=f"BayesOpt+GP ({np.average(data_bayesopt[10:]):.4f})",
-    color=COLORS[0],
-)
+
 # +200*0.76/5.89
 plt.plot(
     np.array(range(len(data_200[f"bayesopt_score"][10:]))),
@@ -45,23 +40,6 @@ plt.plot(
     color=COLOR,
     alpha=1,
 )
-# +100*0.76/5.89
-# plt.plot(
-#     np.array(range(len(data_100[f"bayesopt_score"][10:]))),
-#     np.array(data_100[f"bayesopt_score"][10:]),
-#     label=f"BayesOpt+GP with 100 Distilled-{args.proxy} ({np.average(np.array(data_100[f'bayesopt_score'][10:])):.4f})",
-#     color=COLORS[5],
-#     alpha=0.66,
-# )
-# +50*0.76/5.89
-plt.plot(
-    np.array(range(len(data_50[f"bayesopt_score"][10:]))),
-    np.array(data_50[f"bayesopt_score"][10:]),
-    label=f"BayesOpt+GP with 50 Distilled-{args.proxy} ({np.average(np.array(data_50[f'bayesopt_score'][10:])):.4f})",
-    color=COLOR,
-    alpha=0.5,
-)
-# +50*0.76/5.89
 plt.plot(
     np.array(range(len(data_200[f"proxy_first_score"][10:]))),
     np.array(data_200[f"proxy_first_score"][10:]),
@@ -76,6 +54,18 @@ plt.plot(
     color=COLOR,
     linestyle="--",
     alpha=0.5,
+)
+plt.plot(
+    np.array(range(len(data_50[f"bayesopt_score"][10:]))),
+    np.array(data_50[f"bayesopt_score"][10:]),
+    label=f"BayesOpt+GP with 50 Distilled-{args.proxy} ({np.average(np.array(data_50[f'bayesopt_score'][10:])):.4f})",
+    color=COLOR,
+    alpha=0.5,
+)
+plt.plot(
+    np.array(data_bayesopt[10:]),
+    label=f"BayesOpt+GP ({np.average(data_bayesopt[10:]):.4f})",
+    color=COLORS[0],
 )
 
 ax = plt.gca()
