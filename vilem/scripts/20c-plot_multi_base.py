@@ -16,10 +16,8 @@ COLORS = [
 mpl.rcParams["lines.linewidth"] = 2
 
 data_S_50 = h5py.File('computed/results-multi/all_0.7_1_S_50.h5', 'r')
-data_S_100 = h5py.File('computed/results-multi/all_0.7_1_S_100.h5', 'r')
 data_S_200 = h5py.File('computed/results-multi/all_0.7_1_S_200.h5', 'r')
 data_M_50 = h5py.File('computed/results-multi/all_0.7_1_M_50.h5', 'r')
-data_M_100 = h5py.File('computed/results-multi/all_0.7_1_M_100.h5', 'r')
 data_M_200 = h5py.File('computed/results-multi/all_0.7_1_M_200.h5', 'r')
 
 data_bayeslogprob = h5py.File('computed/results-multi/all_0.7_1_avg_logprob_200.h5', 'r')["bayesopt_score"]

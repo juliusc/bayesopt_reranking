@@ -20,7 +20,6 @@ COLORS = [
 mpl.rcParams["lines.linewidth"] = 2
 
 data_50 = h5py.File(f'computed/results-multi/all_0.7_1_{args.proxy}_50.h5', 'r')
-data_100 = h5py.File(f'computed/results-multi/all_0.7_1_{args.proxy}_100.h5', 'r')
 data_200 = h5py.File(f'computed/results-multi/all_0.7_1_{args.proxy}_200.h5', 'r')
 
 data_bayesopt = h5py.File('computed/results-base/all_0.7_1.h5', 'r')["bayesopt_score"]

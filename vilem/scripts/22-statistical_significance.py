@@ -10,10 +10,8 @@ args = args.parse_args()
 data_basic = h5py.File('computed/results-base/all_0.7_1.h5', 'r')
 data_bayeslogprob = h5py.File('computed/results-multi/all_0.7_1_avg_logprob_200.h5', 'r')
 data_S_50 = h5py.File('computed/results-multi/all_0.7_1_S_50.h5', 'r')
-data_S_100 = h5py.File('computed/results-multi/all_0.7_1_S_100.h5', 'r')
 data_S_200 = h5py.File('computed/results-multi/all_0.7_1_S_200.h5', 'r')
 data_M_50 = h5py.File('computed/results-multi/all_0.7_1_M_50.h5', 'r')
-data_M_100 = h5py.File('computed/results-multi/all_0.7_1_M_100.h5', 'r')
 data_M_200 = h5py.File('computed/results-multi/all_0.7_1_M_200.h5', 'r')
 
 
@@ -32,7 +30,7 @@ TITLE = {
     1: r"Budget 30 \hspace{2cm}",
     2: r"Budget 60 \hspace{2cm}",
     3: r"Budget 90 \hspace{2cm}",
-    4: r"Across budgets 10 to 190 \hspace{0.2cm}",
+    4: r"Across budgets 10 to 190 \hspace{-0.2cm}",
 }
 
 group_all = {}
@@ -58,7 +56,7 @@ def big_comparer(group1, group2):
 
     # header row
     print(
-        r"\bf \Large " + TITLE[args.group] + r"\hspace{2cm}",
+        r"\bf \Large " + TITLE[args.group]",
         *[r"\rotatebox{90}{" + x + "}" for x in group2.keys() if x != "hline"],
         sep=" & ", end=" \\\\\n"
     )
