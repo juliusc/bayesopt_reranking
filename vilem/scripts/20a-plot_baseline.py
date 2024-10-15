@@ -18,7 +18,7 @@ mpl.rcParams["lines.linewidth"] = 2
 
 data = h5py.File('computed/results-base/all_0.7_1.h5', 'r')
 
-_, axs = plt.subplots(nrows=1, ncols=2, figsize=(8, 3))
+_, axs = plt.subplots(nrows=1, ncols=2, figsize=(8, 2.8))
 
 TYPE = "score" 
 axs[0].plot(

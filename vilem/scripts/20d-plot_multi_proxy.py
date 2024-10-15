@@ -26,7 +26,7 @@ data_200 = h5py.File(f'computed/results-multi/all_0.7_1_{args.proxy}_200.h5', 'r
 data_bayesopt = h5py.File('computed/results-base/all_0.7_1.h5', 'r')["bayesopt_score"]
 
 
-plt.figure(figsize=(4, 4))
+plt.figure(figsize=(4, 3.4))
 
 COLOR = COLORS[3] if args.proxy == "S" else COLORS[4]
 
@@ -93,10 +93,10 @@ ax.legend(
     fancybox=False,
     labelspacing=0.3,
     loc='upper center',
-    bbox_to_anchor=(0.45, 1.42),
-    framealpha=0,
+    bbox_to_anchor=(0.45, 1.58),
+    framealpha=1,
 )
-plt.subplots_adjust(top=0.63)
+plt.subplots_adjust(top=0.56)
 plt.tight_layout(rect=(0, 0, 1, 1))
 plt.savefig(f"figures/results_multi_{args.proxy}.pdf")
 plt.show()
