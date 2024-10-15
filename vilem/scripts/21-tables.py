@@ -1,4 +1,10 @@
 import h5py
+import argparse
+
+args = argparse.ArgumentParser()
+args.add_argument("part", type=int, default=1, choices=[1, 2])
+args = args.parse_args()
+
 data_basic = h5py.File('computed/results-base/all_0.7_1.h5', 'r')
 data_bayeslogprob = h5py.File('computed/results-multi/all_0.7_1_avg_logprob_200.h5', 'r')["bayesopt_score"]
 data_S_50 = h5py.File('computed/results-multi/all_0.7_1_S_50.h5', 'r')
@@ -8,13 +14,16 @@ data_M_50 = h5py.File('computed/results-multi/all_0.7_1_M_50.h5', 'r')
 data_M_100 = h5py.File('computed/results-multi/all_0.7_1_M_100.h5', 'r')
 data_M_200 = h5py.File('computed/results-multi/all_0.7_1_M_200.h5', 'r')
 
+if args.part == 1:
+    data_i = range(10, 110, 10)
+elif args.part == 2:
+    data_i = range(110, 210, 10)
+
 def plot_row(name, places, data):
-    # 10, 40, 70, 100, 130, 160, 190
-    data_sub = data[10::30]
     print(
         name,
         places,
-        *[f"{x:.4f}" for x in data_sub],
+        *[f"{x:.4f}" for i, x in enumerate(data) if i in data_i],
         sep=" & ",
         end=" \\\\\n"
     )
@@ -30,7 +39,7 @@ print(
 print(
     r"\bf Method",
     r"\bf Figure",
-    *[f"\\bf {x}" for x in range(10, 200, 30)],
+    *[f"\\bf {x}" for x in data_i],
     sep=" & ",
     end=" \\\\\n",
 )
