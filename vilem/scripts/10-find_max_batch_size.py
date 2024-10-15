@@ -5,8 +5,12 @@ import os
 args = argparse.ArgumentParser()
 args.add_argument('-m', '--model')
 args = args.parse_args()
+import torch
 
 # either local or download
+
+#model_path = args.model
+
 if os.path.isfile(args.model):
     model_path = args.model
 else:
@@ -15,7 +19,7 @@ else:
 model = load_from_checkpoint(model_path)
 
 
-for bs in range(10, 2_000, 10):
+for bs in range(1890, 4_000, 10):
     # make sure the inputs are long enough
     data_comet = [
         {
@@ -26,13 +30,13 @@ for bs in range(10, 2_000, 10):
     ]
     print("Trying batch size of", bs)
     try:
-        output = model.predict(data_comet, batch_size=bs, gpus=1).scores
+        output = model.predict(data_comet, batch_size=bs, gpus=1, num_workers=1).scores
     except Exception as e:
         print(e)
         exit()
 
 
-# python3 scripts/10-find_max_batch_size.py -m Unbabel/wmt22-cometkiwi-da # 60
-# python3 scripts/10-find_max_batch_size.py -m models/skintle-L/model-L-v10.ckp # 120
-# python3 scripts/10-find_max_batch_size.py -m models/skintle-M/model-M-v20.ckp # 390
-# python3 scripts/10-find_max_batch_size.py -m models/skintle-S/model-S-v1.ckp # 390
+# python3 scripts/10-find_max_batch_size.py -m Unbabel/wmt22-cometkiwi-da # 60                 # Maike: 360
+# python3 scripts/10-find_max_batch_size.py -m /net/tscratch/people/plgzuefle/MT_marathon/efficient_reranking/models/skintle-L/model/skintle-L-v10.ckpt # 120          # Maike: 920
+# python3 scripts/10-find_max_batch_size.py -m /net/tscratch/people/plgzuefle/MT_marathon/efficient_reranking/models/skintle-M/model/skintle-M-v20.ckpt # 390          # Maike: 1890
+

@@ -6,7 +6,7 @@ import time
 
 args = argparse.ArgumentParser()
 args.add_argument('-m', '--model')
-args.add_argument('-d', '--data', default='data/jsonl/test.jsonl')
+args.add_argument('-d', '--data', default="/net/tscratch/people/plgzuefle/MT_marathon/efficient_reranking/vilem/data/test.jsonl")
 args.add_argument('-o', '--out', default="/dev/null")
 args.add_argument('-bs', '--batch-size', type=int, default=16)
 args = args.parse_args()
@@ -34,12 +34,18 @@ data_comet = [
 print("Data size:", len(data_comet))
 
 time_start = time.time()
-output = model.predict(data_comet, batch_size=args.batch_size, gpus=1).scores
+output = model.predict(data_comet, batch_size=args.batch_size, gpus=1, num_workers=1).scores
 time_total = time.time() - time_start
 print(f"Time: {time_total:.2f}s")
-print(f"Time/1000 samples: {time_total/len(data)*1000:.2f}s")
+#print(f"Time/1000 samples: {time_total/len(data)*1000:.2f}s")
+print(f"Time/10000 samples: {time_total/len(data)*10000:.2f}s")
 
 with open(args.out, "w") as f:
     for line, score in zip(data, output):
         line["model"] = score
         f.write(json.dumps(line, ensure_ascii=False) + "\n")
+
+
+# python3 scripts/04a-score_comet.py -m Unbabel/wmt22-cometkiwi-da --batch-size 350                                                                                        # 
+# python3 scripts/04a-score_comet.py -m /net/tscratch/people/plgzuefle/MT_marathon/efficient_reranking/models/skintle-L/model/skintle-L-v10.ckpt --batch-size 920          # 
+# python3 scripts/04a-score_comet.py -m /net/tscratch/people/plgzuefle/MT_marathon/efficient_reranking/models/skintle-M/model/skintle-M-v20.ckpt --batch-size 1890         # 
