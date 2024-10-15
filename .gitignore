@@ -1,1 +1,17 @@
 poetry.lock
+*/__pycache__/*
+efficient_reranking/runtime_scripts/test
+efficient_reranking/runtime_scripts/__pycache__/
+log_comet_calls.log
+score_comet_layerwise.py
+shortest_sample.jsonl
+stat_model/
+test_small.jsonl
+venv/
+COMET/
+comet_calls.json
+efficient_reranking/runtime_scripts/runtime_sample.jsonl
+efficient_reranking/scripts/__pycache__/
+efficient_reranking/runtime_scripts/80_testset
+efficient_reranking/runtime_scripts/runtime_sample.jsonl
+models
