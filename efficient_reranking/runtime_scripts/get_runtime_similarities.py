@@ -78,4 +78,4 @@ if __name__ == "__main__":
     args = parser.parse_args()
     main(args)
 
-# python efficient_reranking/runtime_scripts/h5d_get_similarities.py efficient_reranking/runtime_scripts
+# python efficient_reranking/runtime_scripts/get_runtime_similarities.py efficient_reranking/runtime_scripts

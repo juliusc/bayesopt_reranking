@@ -87,4 +87,4 @@ if __name__ == "__main__":
     args = parser.parse_args()
     main(args)
 
-# efficient_reranking/runtime_scripts/get_runtime_baseline.py
+# python efficient_reranking/runtime_scripts/get_runtime_generate_cands.py

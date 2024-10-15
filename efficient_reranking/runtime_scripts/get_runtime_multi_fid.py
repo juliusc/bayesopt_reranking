@@ -264,8 +264,12 @@ if __name__ == "__main__":
     args = parser.parse_args()
     main(args)
 
+
+# python efficient_reranking/runtime_scripts/get_runtime_multi_fid.py blub efficient_reranking/runtime_scripts skintle all test 10 0.25 S 50
+
+
 # python efficient_reranking/runtime_scripts/get_runtime_multi_fid.py blub efficient_reranking/runtime_scripts skintle all test 10 0.25 S 200
 # python efficient_reranking/runtime_scripts/get_runtime_multi_fid.py blub efficient_reranking/runtime_scripts skintle all test 10 0.25 M 200
 
-# python efficient_reranking/runtime_scripts/get_runtime_multi_fid.py blub efficient_reranking/runtime_scripts skintle all test 10 0.25 S 50
+
 # python efficient_reranking/runtime_scripts/get_runtime_multi_fid.py blub efficient_reranking/runtime_scripts skintle all test 10 0.25 M 50

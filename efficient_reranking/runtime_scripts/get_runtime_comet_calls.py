@@ -64,13 +64,15 @@ def prepare_comet_input(comet_calls, sources, texts):
     return init_cands, later_cands, proxy_cands
 
 
-def set_logging(need_proxy, comet_path):
+def set_logging(need_proxy, comet_calls_path):
     # Set up logging to log to a file and the console
     logger = logging.getLogger()  # Use root logger
     logger.setLevel(logging.INFO)
-    breakpoint()
+
     if need_proxy:
-        file_handler = logging.FileHandler(f'log_runtime_comet_calls_proxy.log', mode='a')
+        # efficient_reranking/runtime_scripts/test/comet_calls/comet_calls_batch10_multi_fid_50_S.json
+        model_type = comet_calls_path.split("multi_fid_")[-1].rstrip(".json")
+        file_handler = logging.FileHandler(f'log_runtime_comet_calls_proxy_{model_type}.log', mode='a')
     else:
         file_handler = logging.FileHandler(f'log_runtime_comet_calls.log', mode='a')
     file_handler.setLevel(logging.INFO)
@@ -103,7 +105,7 @@ def main(args):
     if need_proxy and not args.comet_path:
         raise ValueError
 
-    logger = set_logging(need_proxy, args.comet_path)
+    logger = set_logging(need_proxy, args.comet_calls_path)
 
     # Global start time
     global_start_time = time.time()
@@ -116,12 +118,38 @@ def main(args):
         model = comet.load_from_checkpoint(model_path).eval()
     if args.comet_path and need_proxy:
         proxy_model = comet.load_from_checkpoint(args.comet_path)
-    else:
-        raise ValueError("Must provide --comet_repo or --comet_path.")
+
     comet_loading_time = time.time() - comet_loading_start
 
-       
-    # calculate comet for initial candidates
+
+    # comet_loading_times = []
+    # total_runs = 10
+
+    # for i in range(total_runs):
+    #     logger.info(f"Loading COMET model: Run {i + 1}/{total_runs}")
+        
+    #     comet_loading_start = time.time()
+
+    #     # Load the COMET model from the repository or path
+    #     if args.comet_repo:
+    #         model_path = comet.download_model(args.comet_repo)
+    #         model = comet.load_from_checkpoint(model_path).eval()
+        
+    #     if args.comet_path and need_proxy:
+    #         proxy_model = comet.load_from_checkpoint(args.comet_path)
+        
+    #     comet_loading_time = time.time() - comet_loading_start
+    #     comet_loading_times.append(comet_loading_time)
+    #     logger.info(f"COMET model loading completed in {comet_loading_time:.2f} seconds.")
+
+    # # Calculate average loading time
+    # avg_loading_time = np.mean(comet_loading_times)
+    # logger.info(f"Average COMET model loading time over {total_runs} runs: {avg_loading_time:.2f} seconds.")
+    # print(f"Average COMET model loading time over {total_runs} runs: {avg_loading_time:.2f} seconds.")
+    # raise Exception
+
+ 
+    #calculate comet for initial candidates
     init_comet_time = time.time()
     scores = model.predict(samples=init_cands, batch_size=args.max_batch_size, gpus=GPUS, num_workers=NUM_WORKERS).scores
     init_comet_time_all = time.time() - init_comet_time
@@ -177,7 +205,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
     main(args)
 
-# python efficient_reranking/runtime_scripts/get_runtime_comet_calls.py --comet_calls_path  "efficient_reranking/runtime_scripts/test/comet_calls_batch10.json" 
+# python efficient_reranking/runtime_scripts/get_runtime_comet_calls.py --comet_calls_path  "efficient_reranking/runtime_scripts/test/comet_calls/comet_calls_batch10.json" 
 
 
 # python efficient_reranking/runtime_scripts/get_runtime_comet_calls.py --comet_calls_path efficient_reranking/runtime_scripts/test/comet_calls/comet_calls_batch10_multi_fid_50_S.json --comet_path models/skintle-M/model/skintle-M-v20.ckpt
