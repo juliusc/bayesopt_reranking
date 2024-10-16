@@ -20,7 +20,7 @@ data_5 = h5py.File('computed/results-base/all_0.7_5.h5', 'r')
 data_10 = h5py.File('computed/results-base/all_0.7_10.h5', 'r')
 TYPE = "score" 
 
-plt.figure(figsize=(4, 2.8))
+plt.figure(figsize=(4, 2.4))
 plt.gca().set_clip_on(False)
 
 for data_i, (data, bs) in enumerate([(data_2, 2), (data_5, 5), (data_10, 10)][::-1]):
@@ -42,7 +42,7 @@ plt.xlim(-10, 200)
 plt.hlines(0, *plt.xlim(), color="black", linewidth=0.7)
 
 plt.gca().spines[["top", "right", "bottom"]].set_visible(False)
-plt.ylabel("$\Delta$ in selected candidate score\nagainst batch size 1")
+plt.ylabel("$\Delta$ in selected candidate       \nscore against batch size 1     ")
 plt.xlabel("Max number of CometKiwi runs")
 
 plt.xticks(

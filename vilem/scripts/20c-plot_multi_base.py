@@ -26,7 +26,7 @@ data_bayesopt = h5py.File('computed/results-base/all_0.7_1.h5', 'r')["bayesopt_s
 data_random = h5py.File('computed/results-base/all_0.7_1.h5', 'r')["random_deduped_score"]
 
 
-plt.figure(figsize=(4, 3.2))
+plt.figure(figsize=(4, 3.1))
 
 TYPE = "score" 
 # TODO: modify cost on x-axis
@@ -75,13 +75,13 @@ ax.set_xticks(
 ax.legend(
     edgecolor="white",
     fancybox=False,
-    labelspacing=0.3,
+    labelspacing=0.1,
     loc='upper center',
-    bbox_to_anchor=(0.45, 1.42),
+    bbox_to_anchor=(0.45, 1.37),
     framealpha=1,
 )
 
-plt.subplots_adjust(top=0.59)
+plt.subplots_adjust(top=0.56)
 plt.tight_layout(rect=(0, 0, 1, 1))
 plt.savefig("figures/results_multi.pdf")
 plt.show()
