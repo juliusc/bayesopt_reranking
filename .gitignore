@@ -15,3 +15,4 @@ efficient_reranking/scripts/__pycache__/
 efficient_reranking/runtime_scripts/80_testset
 efficient_reranking/runtime_scripts/runtime_sample.jsonl
 models
+efficient_reranking/runtime_scripts/test2

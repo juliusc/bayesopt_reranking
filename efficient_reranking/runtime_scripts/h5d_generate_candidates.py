@@ -10,7 +10,7 @@ import torch
 
 from tqdm import tqdm
 from transformers import GenerationConfig, M2M100ForConditionalGeneration, AutoTokenizer
-
+import time
 import utils
 
 MAX_GENERATION_LENGTH = 256
@@ -117,20 +117,23 @@ def main(args):
 
     logging.info(f"Generating candidates...")
 
+    total_time = 0  # Initialize total time accumulator
+
+    # Inside the main for loop
     for i, data_line in enumerate(tqdm(data_lines[:args.subset])):
         # if i < 1299:
         #     continue
         data = json.loads(data_line)
         src_lang, tgt_lang = data["langs"].split("-")
-        # The way the tokenizer src_lang is set and tgt_lang is set during generate()
-        # is specific to NLLB.
         tokenizer.src_lang = utils.LANG_TO_NLLB[src_lang]
         tgt_lang_token = tokenizer.convert_tokens_to_ids(utils.LANG_TO_NLLB[tgt_lang])
         inputs = tokenizer(data["src"], padding=True, return_tensors="pt").to(model.device)
         all_result_data = []
+
         if args.generation_mode == "beam":
             try:
                 with torch.no_grad():
+                    start_time = time.time()  # Start timing this iteration
                     result = model.generate(
                         **inputs,
                         generation_config=gen_config,
@@ -138,23 +141,33 @@ def main(args):
                         output_scores=True,
                         output_hidden_states=True,
                         return_dict_in_generate=True)
-                result_data = process_result(result, tokenizer, args.generation_mode)
-                all_result_data.append(result_data)
+                    elapsed_time = time.time() - start_time  # Stop timing this iteration
+
+                    result_data = process_result(result, tokenizer, args.generation_mode)
+                    all_result_data.append(result_data)
+                    total_time += elapsed_time  # Accumulate time only for successful iterations
+                logging.info(f"Instance {i}: Beam search took {elapsed_time:.4f} seconds")
             except torch.OutOfMemoryError:
                 logging.info(f"Instance {i} failed with out-of-memory error. Skipping.")
                 continue
+
         elif args.generation_mode == "sample":
             with torch.no_grad():
                 encoder_outputs = model.model.encoder(**inputs)
             max_batch_size = args.max_batch_size or args.num_candidates
             num_samples_done = 0
+
             while num_samples_done < args.num_candidates:
                 try:
+                    start_time = time.time()  # Start timing this iteration
+
                     batch_size = min(max_batch_size, args.num_candidates - num_samples_done)
                     gen_config = get_generation_config(
                         args.generation_mode,
                         batch_size,
                         epsilon_cutoff=args.epsilon)
+
+                   
                     with torch.no_grad():
                         result = model.generate(
                             encoder_outputs=encoder_outputs.copy(),
@@ -164,15 +177,23 @@ def main(args):
                             output_scores=True,
                             output_hidden_states=True,
                             return_dict_in_generate=True)
-                        result_data = process_result(result, tokenizer, args.generation_mode)
-                        all_result_data.append(result_data)
+                    
+                    
+                    result_data = process_result(result, tokenizer, args.generation_mode)
+                    all_result_data.append(result_data)
                     num_samples_done += batch_size
+                    elapsed_time = time.time() - start_time  # Stop timing this iteration
+                    total_time += elapsed_time  # Accumulate time only for successful iterations
+                    logging.info(f"Instance {i}: Sampling took {elapsed_time:.4f} seconds")
+
                 except torch.OutOfMemoryError:
                     new_max_batch_size = max_batch_size // 2 + (max_batch_size % 2 > 0)
                     logging.info(
                         f"Instance {i} failed with out-of-memory error. Reducing batch "
                         f"size from {max_batch_size} to {new_max_batch_size}.")
                     max_batch_size = new_max_batch_size
+
+
 
         text_to_idx = {}
         for text, token_logprobs, embedding in zip(*[itertools.chain(*x) for x in zip(*all_result_data)]):
@@ -187,7 +208,8 @@ def main(args):
 
             counts_h5ds[i, text_idx] += 1
 
-
+    # After the loop completes, log or print the total accumulated time
+    logging.info(f"Total time for successful iterations: {total_time:.4f} seconds")
     output_file.close()
     logging.info(f"Finished.")
 
@@ -231,4 +253,4 @@ if __name__ == "__main__":
     args = parser.parse_args()
     main(args)
 
-# python efficient_reranking/runtime_scripts/h5d_generate_candidates.py test efficient_reranking/runtime_scripts --max_batch_size 80
+# python efficient_reranking/runtime_scripts/h5d_generate_candidates.py test2 efficient_reranking/runtime_scripts --max_batch_size 80

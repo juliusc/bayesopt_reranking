@@ -47,8 +47,8 @@ def main(args):
 
     # Start of candidate generation
     candidate_generation_start = time.time()
-    all_sources, all_texts, embeddings, all_counts = generate_candidates(args.data_path, args.num_candidates, args.max_batch_size, args.epsilon)
-    #all_sources, all_texts, all_counts = generate_candidates_no_hidden(args.data_path, args.num_candidates, args.max_batch_size, args.epsilon)
+    #all_sources, all_texts, embeddings, all_counts = generate_candidates(args.data_path, args.num_candidates, args.max_batch_size, args.epsilon)
+    all_sources, all_texts, all_counts = generate_candidates_no_hidden(args.data_path, args.num_candidates, args.max_batch_size, args.epsilon)
     candidate_generation_time = time.time() - candidate_generation_start
 
     logger.info("=== SUMMARY OF TIMES ===")

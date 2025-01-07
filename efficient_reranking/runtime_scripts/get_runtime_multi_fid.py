@@ -215,7 +215,7 @@ def main(args):
     for key, value in iter_times.items():
         logger.info(f"Time taken for {key*10} candidates: {value:.4f} seconds.")
 
-    with open(f"comet_calls_batch10_multi_fid_{args.num_proxy_evals}_{args.metric}.json", "w") as file:
+    with open(f"comet_calls_batch10_multi_fid_{args.num_proxy_evals}_{args.metric}_dev_corr.json", "w") as file:
         json.dump(comet_calls, file, indent=4)
 
 
@@ -265,7 +265,7 @@ if __name__ == "__main__":
     main(args)
 
 
-# python efficient_reranking/runtime_scripts/get_runtime_multi_fid.py blub efficient_reranking/runtime_scripts skintle all test 10 0.25 S 50
+# python efficient_reranking/runtime_scripts/get_runtime_multi_fid.py blub efficient_reranking/runtime_scripts skintle all test 10 0.25 S 50 --use_dev_correlation
 
 
 # python efficient_reranking/runtime_scripts/get_runtime_multi_fid.py blub efficient_reranking/runtime_scripts skintle all test 10 0.25 S 200

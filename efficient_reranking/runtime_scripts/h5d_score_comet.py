@@ -151,7 +151,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
     main(args)
 
-# python efficient_reranking/runtime_scripts/h5d_score_comet.py test efficient_reranking/runtime_scripts --comet_repo "Unbabel/wmt22-cometkiwi-da" "--comet_batch_size" 200
+# python efficient_reranking/runtime_scripts/h5d_score_comet.py test2 efficient_reranking/runtime_scripts --comet_repo "Unbabel/wmt22-cometkiwi-da" "--comet_batch_size" 200
 
 # python efficient_reranking/runtime_scripts/h5d_score_comet.py test efficient_reranking/runtime_scripts --comet_path "models/skintle-L/model/skintle-L-v10.ckpt" "--comet_batch_size" 200
 

@@ -207,7 +207,7 @@ if __name__ == "__main__":
 
 # python efficient_reranking/runtime_scripts/get_runtime_comet_calls.py --comet_calls_path  "efficient_reranking/runtime_scripts/test/comet_calls/comet_calls_batch10.json" 
 
-
+# python efficient_reranking/runtime_scripts/get_runtime_comet_calls.py --comet_calls_path efficient_reranking/runtime_scripts/test/comet_calls/comet_calls_batch10_multi_fid_50_S_dev_corr.json --comet_path models/skintle-M/model/skintle-M-v20.ckpt
 # python efficient_reranking/runtime_scripts/get_runtime_comet_calls.py --comet_calls_path efficient_reranking/runtime_scripts/test/comet_calls/comet_calls_batch10_multi_fid_50_S.json --comet_path models/skintle-M/model/skintle-M-v20.ckpt
 # python efficient_reranking/runtime_scripts/get_runtime_comet_calls.py --comet_calls_path efficient_reranking/runtime_scripts/test/comet_calls/comet_calls_batch10_multi_fid_50_M.json --comet_path models/skintle-L/model/skintle-L-v10.ckpt
 
