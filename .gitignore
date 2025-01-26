@@ -1,1 +1,5 @@
 poetry.lock
+tmp
+data
+computed
+models
