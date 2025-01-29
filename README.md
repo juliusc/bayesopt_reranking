@@ -1,6 +1,6 @@
-# A Bayesian Optimization Approach to Machine Translation Reranking
+# A Bayesian Optimization Approach to Machine Translation Reranking [![Paper](https://img.shields.io/badge/📜%20paper-481.svg)](https://arxiv.org/abs/2411.09694)
 
-Read the [paper](https://arxiv.org/abs/2411.09694) by Julius Cheng, Maike Züfle, Vilém Zouhar, and Andreas Vlachos.
+By Julius Cheng, Maike Züfle, Vilém Zouhar, and Andreas Vlachos.
 
 > Reranking a list of candidates from a machine translation system with an external scoring model and returning the highest-scoring candidate remains a simple and effective method for improving the overall output quality. Translation scoring models continue to grow in size, with the best models being comparable to generation models. Thus, reranking can add substantial computational cost to the translation pipeline. In this work, we pose reranking as a Bayesian optimization (BayesOpt) problem. By strategically selecting candidates to score based on a balance of exploration and exploitation, we show that it is possible to find top-scoring candidates when scoring only a fraction of the candidate list. For instance, our method achieves the same CometKiwi score using only 70 scoring evaluations compared a baseline system using 180. We present a multi-fidelity setting for BayesOpt, where the candidates are first scored with a cheaper but noisier proxy scoring model, which further improves the cost-performance tradeoff when using smaller but well-trained distilled proxy scorers.
 
