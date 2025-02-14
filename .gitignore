@@ -1,1 +1,11 @@
 poetry.lock
+__pycache__*
+*.tar
+*.sh
+models-*
+models/*
+output/*
+venv/*
+z_outputs/*
+COMET/
+efficient_reranking/runtime_scripts/
