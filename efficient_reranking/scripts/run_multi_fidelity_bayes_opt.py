@@ -40,7 +40,7 @@ def conditional_mean_and_covar(known_values, mean, covar):
     xy_covar = yx_covar.T
     yy_covar = covar[num_known_columns:,num_known_columns:]
     y_given_x_mean = np.expand_dims(y_mean, 1) + np.dot(np.dot(yx_covar, np.linalg.inv(xx_covar)), (known_values - x_mean).T)
-    # return y_given_x_mean.T
+
     y_given_x_covar = yy_covar - np.dot(yx_covar, np.dot(np.linalg.inv(xx_covar), xy_covar))
     return y_given_x_mean.T, y_given_x_covar
 
@@ -127,26 +127,6 @@ def main(args):
         log_data[f"{method}_best_retrieved"] = defaultdict(float)
         log_data[f"{method}_scores"] = defaultdict(lambda: [0.0] * len(all_scores))
 
-    # corrs = []
-    # if args.use_dev_correlation:
-    #     m_1_scores = []
-    #     m_star_scores = []
-    #     for scores, counts, avg_logprobs in zip(all_scores, all_counts, all_avg_logprobs):
-    #         if args.metric == "S":
-    #             m_scores_orig = scores[:, 1]
-    #         elif args.metric == "M":
-    #             m_scores_orig = scores[:, 2]
-    #         elif args.metric == "avg_logprob":
-    #             m_scores_orig = avg_logprobs[:(counts > 0).sum()]
-    #         else:
-    #             raise ValueError(f"Unknown metric '{args.metric}'")
-    #         m_1_scores.append(normalize(m_scores_orig))
-    #         m_star_scores.append(normalize(scores[:, -1]))
-    #     dev_corr = pearsonr(np.concatenate(m_1_scores), np.concatenate(m_star_scores))
-    #     print(dev_corr)
-    #     sys.exit()
-
-    # all_scores = all_scores[:100]
 
     for instance_idx, (scores, sims, counts, sum_logprobs, avg_logprobs) in enumerate(tqdm(zip(all_scores, all_sims, all_counts, all_sum_logprobs, all_avg_logprobs))):
         if args.metric == "S":
@@ -166,8 +146,6 @@ def main(args):
 
         m_1_subset_idxs = random_deduped_idxs[:args.num_proxy_evals]
 
-        # m_scores -= m_scores.mean()
-        # m_scores /= m_scores.std()
         m_star_scores = scores[:, -1]
 
         all_idxs = np.arange(m_star_scores.shape[0])
@@ -178,8 +156,7 @@ def main(args):
         known_idxs = m_1_sorted_idxs[:INITIAL_SIZE]
         unknown_idxs = [x for x in all_idxs if x not in known_idxs]
         # Elements for which m_1 scores are known and m_star_scores are unknown.
-        # Need a better name for this
-        # m_1_used_idxs = [x for x in m_1_sorted_idxs if x not in known_idxs]
+
         m_1_used_idxs = list(m_1_sorted_idxs)
 
         rbf_cov = np.exp(-(1 - sims.reshape(-1)) / (2 * args.bandwidth ** 2)).reshape(all_idxs.size, all_idxs.size)
@@ -202,17 +179,6 @@ def main(args):
             known_scores = np.concatenate([known_scores_m_1, known_scores_m_star])
 
             unknown_unknown_cov = rbf_cov[unknown_idxs][:, unknown_idxs]
-
-            # known_scores = np.concatenate([known_scores_m_1[unknown_idxs], known_scores_m_star])
-
-            # known_unknown_cov_m_1 = rbf_cov[unknown_idxs][:, unknown_idxs] * metrics_corr
-            # known_unknown_cov_m_star = rbf_cov[known_idxs][:, unknown_idxs]
-            # known_unknown_cov = np.concatenate([known_unknown_cov_m_1, known_unknown_cov_m_star])
-
-            # known_known_cov_m_star = rbf_cov[known_idxs][:, known_idxs]
-            # known_known_cov_m_1_m_star = rbf_cov[known_idxs][:, unknown_idxs] * metrics_corr
-            # known_known_cov_m_1 = rbf_cov[unknown_idxs][:, unknown_idxs]
-            # known_known_cov = np.concatenate([np.concatenate([known_known_cov_m_1, known_known_cov_m_1_m_star]), np.concatenate([known_known_cov_m_1_m_star.T, known_known_cov_m_star])], axis=1)
 
             known_scores = np.concatenate([m_scores_orig[m_1_used_idxs], known_scores_m_star])
 
@@ -243,8 +209,6 @@ def main(args):
 
             known_idxs = known_idxs + list(best_idxs)
             unknown_idxs = [x for x in all_idxs if x not in known_idxs]
-            # m_1_used_idxs = [x for x in m_1_sorted_idxs if x not in known_idxs]
-
 
         for total_cands in range(len(known_idxs), MAX_EVALS + 1):
             log_data["proxy_first_score"][total_cands] += m_star_scores[m_1_first_sorted_idxs[:total_cands]].max()
@@ -253,7 +217,7 @@ def main(args):
             log_data["proxy_first_scores"][total_cands][instance_idx] += m_star_scores[m_1_first_sorted_idxs[:total_cands]].max()
             log_data["bayesopt_scores"][total_cands][instance_idx] += m_star_scores[known_idxs].max()
 
-            # print(total_cands, m_star_scores[known_idxs].max())
+
 
     output_dir = work_dir / args.split / "proxy_results"
     output_dir.mkdir(parents=True, exist_ok=True)

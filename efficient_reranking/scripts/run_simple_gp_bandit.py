@@ -34,7 +34,7 @@ def conditional_mean_and_covar(known_values, mean, covar):
     xy_covar = yx_covar.T
     yy_covar = covar[num_known_columns:,num_known_columns:]
     y_given_x_mean = np.expand_dims(y_mean, 1) + np.dot(np.dot(yx_covar, np.linalg.inv(xx_covar)), (known_values - x_mean).T)
-    # return y_given_x_mean.T
+
     y_given_x_covar = yy_covar - np.dot(yx_covar, np.dot(np.linalg.inv(xx_covar), xy_covar))
     return y_given_x_mean.T, y_given_x_covar
 
@@ -136,11 +136,7 @@ def main(args):
 
         best_idx = scores.argmax()
 
-        # highest_logprob_idxs = list(list(zip(*sorted(zip(-np.array(logprobs), range(len(scores))))))[1][:MAX_EVALS])
-        # baseline_total += scores[highest_logprob_idxs].max()
-
         all_idxs = np.arange(scores.shape[0])
-        # known_idxs = list(np.random.choice(scores.shape[0], min(INITIAL_SIZE, all_idxs.shape[0]), replace=False))
         known_idxs = list(random_deduped_idxs[:INITIAL_SIZE])
         unknown_idxs = [x for x in all_idxs if x not in known_idxs]
 
@@ -175,12 +171,11 @@ def main(args):
             known_scores = scores[known_idxs]
             known_scores -= known_scores.mean()
             known_scores /= np.std(known_scores)
-            # known_scores -= fixed_mean
-            # known_scores /= fixed_std
+
             unknown_unknown_cov = rbf_cov[unknown_idxs][:, unknown_idxs]
             known_unknown_cov = rbf_cov[known_idxs][:, unknown_idxs]
             known_known_cov = rbf_cov[known_idxs][:, known_idxs]
-            prior_cov = 0
+
 
             inverse_known_known_plus_prior = np.linalg.inv(known_known_cov)
             term_1 = np.matmul(inverse_known_known_plus_prior, known_unknown_cov)
@@ -191,16 +186,12 @@ def main(args):
             posterior_var = posterior_cov.diagonal()
             best_score = known_scores.max()
             cdf = (norm.cdf(best_score, loc=posterior_mean, scale=posterior_var ** 0.5))
-            # best_unknown_idx_idx = (1 - cdf).argmax()
-            # Probability of improvement acquisition function
-            try:
-                best_idxs = np.array(unknown_idxs)[np.argpartition(cdf, min(args.batch_size, len(unknown_idxs)-1))[:args.batch_size]]
-            except:
-                import pdb; pdb.set_trace()
 
-            # Expected improvement acquisition function
-            # ei = ((posterior_mean * norm.cdf(best_score, loc=posterior_mean, scale=posterior_var ** 0.5)) +
-            #       posterior_var ** 0.5 * norm.pdf(best_score, loc=posterior_mean, scale=posterior_var ** 0.5))
+
+            best_idxs = np.array(unknown_idxs)[np.argpartition(cdf, min(args.batch_size, len(unknown_idxs)-1))[:args.batch_size]]
+
+
+
             z = (best_score - posterior_mean) / (posterior_var ** 0.5)
             ei = (
                 posterior_var ** 0.5 *
@@ -216,11 +207,7 @@ def main(args):
             hc_known_idxs = hc_known_idxs + list(best_hc_idxs)
             hc_unknown_idxs = [x for x in all_idxs if x not in hc_known_idxs]
 
-        # while len(known_idxs) < min(MAX_EVALS, all_idxs.shape[0]):
-        #     baseline_random_total[len(known_idxs)] += scores[candidate_idxs[:len(known_idxs)]].max()
-        #     baseline_highest_logprob_total[len(known_idxs)] += scores[logprob_sorted_idxs[:len(known_idxs)]].max()
-        #     bandit_total[len(known_idxs)] += scores[known_idxs].max()
-        #     known_idxs.append(0)
+
 
         for total_cands in range(len(known_idxs), MAX_EVALS + 1):
             if total_cands % args.batch_size == 0:
@@ -260,26 +247,7 @@ def main(args):
         for n in range(MAX_EVALS+1):
             h5ds[n] = np.array(log_data[f"{method}_scores"][n])
 
-        # for n in range(MAX_EVALS):
 
-
-    # print(log_data["baseline_max_total"] / len(all_scores))
-    # for k in log_data["bandit_total"]:
-    #     print(k,
-    #             log_data["bandit_total"][k] / log_data["num_instances"],
-    #             log_data["baseline_random_total"][k] / log_data["num_instances"],
-    #             log_data["baseline_random_deduped_total"][k] / log_data["num_instances"],
-    #             log_data["baseline_hill_climbing_total"][k] / log_data["num_instances"],
-    #             log_data["baseline_highest_logprob_total"][k] / log_data["num_instances"])
-
-
-    # for k in log_data["bandit_total"]:
-    #     print(k,
-    #             log_data["bandit_best_retrieved"][k] / log_data["num_instances"],
-    #             log_data["baseline_random_best_retrieved"][k] / log_data["num_instances"],
-    #             log_data["baseline_random_deduped_best_retrieved"][k] / log_data["num_instances"],
-    #             log_data["baseline_hill_climbing_best_retrieved"][k] / log_data["num_instances"],
-    #             log_data["baseline_highest_logprob_best_retrieved"][k] / log_data["num_instances"])
 
 
 if __name__ == "__main__":
