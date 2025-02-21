@@ -7,14 +7,45 @@ By Julius Cheng, Maike Züfle, Vilém Zouhar, and Andreas Vlachos.
 <img src="figures/highlevel_schema.svg" height=300em>
 
 ## Experiments
+To replicate our experiments, please refer to the scripts in  [efficient_reranking/](efficient_reranking).
 
-TODO
+### Download data 
+The data can be obtained by using scripts from the  [experiments_small_comet/scripts/](experiments_small_comet/scripts/) directory:
+```
+cd experiments_small_comet/scripts
+bash 01a-get_data.sh  # download data
+python 01b-get_da_data.py # prepare data
+```
+The data will be downloaded to `experiments_small_comet/scripts/data/`. 
+### Generate candidates
+
+```
+cd ../../experiments_reranking
+python scripts/generate_candidates.py <data_dir> test <output_dir> --generation_mode sample --max_batch_size 50
+```
+Replace the data and output directory to your needs. Candidates can also be obtained using beam search, to do so, use `beam` as a generation mode instead of `sample`. 
+
+Candidates can then be scored using the following script: 
+
+```
+python scripts/score_comet_layerwise.py <data_dir> test <output_dir> --comet_repo=Unbabel/wmt22-cometkiwi-da
+```
+
+### Run bandit algorithm
+Finally, the GP bandit can be run with the following steps: 
+```
+python scripts/get_logprobs.py <data_dir> <output_dir> # retrieve the log probs
+
+python scripts/get_similarities.py <data_dir> <output_dir> # calculate similarities between candidates
+
+python scripts/run_simple_gp_bandit.py <data_dir> <output_dir> wmt22-cometkiwi-da all test 0.25 50  # run bandit
+```
 
 
 ### Training smaller COMET models
 
 The publicly available COMET models are trained with XLM-Roberta, which might be too expensive to run in re-ranking setting.
-See `experiments/small_comet` for scripts to train a COMET model with smaller 
+See `experiments/small_comet` for scripts to train a COMET model with smaller base LLMs.
 
 ## Cite as 
 ```

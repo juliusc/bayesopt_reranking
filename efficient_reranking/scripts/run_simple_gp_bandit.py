@@ -64,8 +64,7 @@ def load_scores_and_similarities(
 
     split_work_dir = Path(args.work_dir) / split
 
-    model_names = ([f"{args.model_class_name}-{size}" for size in ("S", "M", "L")] +
-                   ["wmt22-cometkiwi-da"])
+    model_names = ([f"{args.model_class_name}"])
 
     num_metrics = len(model_names)
     with (h5py.File((split_work_dir / utils.CANDIDATES_FILENAME).with_suffix(".h5")) as cand_h5,
