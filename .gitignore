@@ -10,3 +10,7 @@ models/*
 output/*
 venv/*
 z_outputs/*
+tmp
+data
+computed
+models
