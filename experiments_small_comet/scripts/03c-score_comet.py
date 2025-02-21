@@ -46,6 +46,3 @@ with open(args.out, "w") as f:
         f.write(json.dumps(line, ensure_ascii=False) + "\n")
 
 
-# python3 scripts/04a-score_comet.py -m Unbabel/wmt22-cometkiwi-da --batch-size 350                                                                                        # 
-# python3 scripts/04a-score_comet.py -m /net/tscratch/people/plgzuefle/MT_marathon/efficient_reranking/models/skintle-L/model/skintle-L-v10.ckpt --batch-size 920          # 
-# python3 scripts/04a-score_comet.py -m /net/tscratch/people/plgzuefle/MT_marathon/efficient_reranking/models/skintle-M/model/skintle-M-v20.ckpt --batch-size 1890         # 
