@@ -59,3 +59,5 @@ See `experiments/small_comet` for scripts to train a COMET model with smaller ba
       url={https://arxiv.org/abs/2411.09694}, 
 }
 ```
+
+<img src="meta/poster.svg" width="700em">
