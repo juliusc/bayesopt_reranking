@@ -14,13 +14,17 @@ unified_metric:
     # test_data:
     #   - da/data/test.csv
     activations: Tanh
+    # pretrained_model: microsoft/infoxlm-large
     encoder_model: XLM-RoBERTa
     dropout: 0.1
+    # batch_size: 16
+    # learning_rate: 1.0e-06
+    # encoder_learning_rate: 1.0e-07
     batch_size: 16
-    learning_rate: 1.0e-06
-    encoder_learning_rate: 1.0e-07
-    nr_frozen_epochs: 100.0  # check max_epochs currently five
-    layerwise_decay: 0.95
+    encoder_learning_rate: 1.0e-05
+    learning_rate: 1.5e-04
+    nr_frozen_epochs: 0.3  # check max_epochs currently five
+    layerwise_decay: 0.98 # 0.95 -> 0.98 becauese 0.95 ** 24 == 0.292 and 0.98 ** 24 == 0.616
     warmup_steps:  100
     final_activation: null
     hidden_sizes:
